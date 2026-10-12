@@ -184,7 +184,14 @@ def main() -> int:
 
     config = uvicorn.Config(app, host=host, port=args.port, log_level="info")
     server = uvicorn.Server(config)
-    server_thread = threading.Thread(target=server.run, name="lidar-fastapi", daemon=True)
+
+    def _run_server() -> None:
+        try:
+            server.run()
+        except Exception:
+            pass
+
+    server_thread = threading.Thread(target=_run_server, name="lidar-fastapi", daemon=True)
     print(f"Đang khởi động backend tại {health_url}...", flush=True)
     server_thread.start()
 

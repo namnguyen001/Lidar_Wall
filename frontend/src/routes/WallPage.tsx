@@ -352,19 +352,20 @@ export default function WallPage() {
 
                 <button
                   onClick={captureCal}
-                  disabled={(calState.progressPct || 0) < 30 && calState.samples < 10}
-                  className={`px-4 py-1.5 font-bold text-xs rounded-lg shadow-md transition flex items-center gap-1.5 ${
-                    (calState.progressPct || 0) >= 30 || calState.samples >= 10
-                      ? 'bg-green-600 hover:bg-green-500 text-white cursor-pointer active:scale-95 shadow-[0_0_15px_rgba(34,197,94,0.5)]'
-                      : 'bg-navy-800 text-slate-500 cursor-not-allowed border border-navy-700'
+                  className={`px-4 py-1.5 font-bold text-xs rounded-lg shadow-md transition flex items-center gap-1.5 active:scale-95 cursor-pointer ${
+                    calState.state === 'POINT_SAVED'
+                      ? 'bg-emerald-500 hover:bg-emerald-400 text-navy-950 font-black shadow-[0_0_20px_rgba(16,185,129,0.8)] animate-pulse'
+                      : calState.state === 'CAPTURING'
+                      ? 'bg-amber-600 hover:bg-amber-500 text-white shadow-[0_0_15px_rgba(245,158,11,0.5)]'
+                      : 'bg-green-600 hover:bg-green-500 text-white shadow-[0_0_15px_rgba(34,197,94,0.5)]'
                   }`}
-                  title={
-                    (calState.progressPct || 0) >= 30
-                      ? 'Chốt điểm này'
-                      : 'Đang đợi lấy mẫu ổn định (đạt ít nhất 30%)'
-                  }
+                  title="Bấm Space để thao tác"
                 >
-                  ⎵ Chốt điểm (Space)
+                  {calState.state === 'POINT_SAVED'
+                    ? `⎵ Sang Điểm ${calState.pointIndex + 2} (Space)`
+                    : calState.state === 'CAPTURING'
+                    ? `⏳ Đang lấy mẫu ${calState.progressPct || 0}%...`
+                    : `⎵ Chốt Điểm ${calState.pointIndex + 1} (Space)`}
                 </button>
                 <button
                   onClick={cancelCal}
@@ -577,17 +578,17 @@ export default function WallPage() {
                       </span>
                     ) : isCurrent ? (
                       <span className={`text-[11px] font-bold font-mono px-3 py-1 rounded-full border shadow-xl ${
-                        progress >= 100
+                        calState.state === 'POINT_SAVED' || progress >= 100
                           ? 'bg-green-600 text-white border-green-400 animate-bounce'
-                          : progress > 0
+                          : calState.state === 'CAPTURING'
                           ? 'bg-amber-950/95 text-amber-300 border-amber-500 animate-pulse'
                           : 'bg-navy-950/95 text-cyan-300 border-cyan-500'
                       }`}>
-                        {progress >= 100
-                          ? `✓ ĐÃ XONG! BƯỚC SANG ĐIỂM TIẾP THEO`
-                          : progress > 0
+                        {calState.state === 'POINT_SAVED' || progress >= 100
+                          ? `✓ ĐÃ LƯU! BẤM SPACE ĐỂ SANG ĐIỂM TIẾP THEO`
+                          : calState.state === 'CAPTURING'
                           ? `⏳ Đang lấy mẫu ${progress}% - Giữ yên!`
-                          : `🎯 Đặt chân vào đây`}
+                          : `🎯 Chạm tay rồi bấm Space`}
                       </span>
                     ) : canDrag ? (
                       <span className="text-[11px] font-bold font-mono bg-navy-950/90 text-cyan-300 px-2 py-0.5 rounded-full border border-cyan-500/60 shadow-lg">
@@ -613,10 +614,10 @@ export default function WallPage() {
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-bold text-cyan-300 flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping inline-block" />
-                {calState?.message || `Hãy đứng chân vào Vòng tròn ${calState?.pointIndex + 1}`}
+                {calState?.message || `Chạm tay vào Điểm ${calState?.pointIndex + 1} rồi bấm Space`}
               </span>
               <span className="text-xs font-mono font-bold text-amber-400">
-                {calState?.samples || 0}/{calState?.samplesNeeded || 30} ({calState?.progressPct || 0}%)
+                {calState?.samples || 0}/{calState?.samplesNeeded || 25} ({calState?.progressPct || 0}%)
               </span>
             </div>
             
@@ -628,8 +629,8 @@ export default function WallPage() {
             </div>
 
             <div className="text-[11px] text-slate-400 mt-2 flex items-center justify-between">
-              <span>💡 Đứng yên ~1s để hệ thống chạy 0% ➔ 100% tự lưu</span>
-              <span>Bấm <kbd className="px-1.5 py-0.5 bg-navy-800 border border-slate-600 rounded text-slate-200 font-mono text-[10px]">Space</kbd> để chốt nhanh</span>
+              <span>💡 Chạm vào điểm mục tiêu rồi bấm Space để lấy mẫu (0% ➔ 100%)</span>
+              <span>Đạt 100% bấm <kbd className="px-1.5 py-0.5 bg-navy-800 border border-slate-600 rounded text-slate-200 font-mono text-[10px]">Space</kbd> để sang điểm tiếp theo</span>
             </div>
           </div>
         </div>
