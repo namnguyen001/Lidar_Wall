@@ -37,10 +37,11 @@ class CalibrationService:
         self.state = CalibrationState()
         self.lock = asyncio.Lock()
         
-        self.auto_capture_radius_px = 60.0
-        self.stable_frames_needed = 5
+        self.auto_capture_radius_px = 200.0
+        self.stable_frames_needed = 4
         self.stable_frames_count = 0
         self.current_samples_mm: list[tuple[float, float]] = []
+        self.last_seen_mm: tuple[float, float] | None = None
         self.h0: np.ndarray | None = None
         self.wall_width_px = 1920
         self.wall_height_px = 1080
@@ -146,6 +147,7 @@ class CalibrationService:
             best_uv = uvs[best_idx]
             best_mm = pts_mm[best_idx]
             
+            self.last_seen_mm = (float(best_mm[0]), float(best_mm[1]))
             self.state.handUv = best_uv.tolist()
             self.state.distancePx = float(best_dist)
             
@@ -154,11 +156,12 @@ class CalibrationService:
                     self.stable_frames_count += 1
                     if self.stable_frames_count >= self.stable_frames_needed:
                         self.state.state = "CAPTURING"
-                        self.state.samples = 0
-                        self.current_samples_mm = []
-                        self.state.message = "Hold still..."
+                        self.state.samples = 1
+                        self.current_samples_mm = [(float(best_mm[0]), float(best_mm[1]))]
+                        self.state.message = f"Hold still ({self.state.pointIndex + 1}/{self.state.pointCount})..."
                 else:
                     self.stable_frames_count = 0
+                    self.state.message = f"Điểm {self.state.pointIndex + 1}: Cách tâm {int(best_dist)}px. Bấm [Space] hoặc chốt điểm để lấy ngay!"
                     
             elif self.state.state == "CAPTURING":
                 if best_dist > self.auto_capture_radius_px * 1.5:
@@ -205,15 +208,28 @@ class CalibrationService:
 
     async def manual_capture(self):
         async with self.lock:
-            if self.state.state in ["WAIT_HAND", "CAPTURING"] and self.state.handUv:
-                # Force finish immediately with current 1 sample
-                pts_mm = np.array(self.current_samples_mm) if len(self.current_samples_mm) > 0 else np.array([[0,0]]) # Need real mm?
-                # Actually manual capture uses current handUv, but we need mm.
-                # Since we don't store mm on state directly, let's just use the last seen.
+            if self.state.state in ["WAIT_HAND", "CAPTURING"]:
+                sample = None
                 if len(self.current_samples_mm) > 0:
-                    self._finish_point()
+                    pts = np.array(self.current_samples_mm)
+                    sample = np.median(pts, axis=0).tolist()
+                elif self.last_seen_mm is not None:
+                    sample = [float(self.last_seen_mm[0]), float(self.last_seen_mm[1])]
+                
+                if sample is not None:
+                    self.state.capturedMm.append(sample)
+                    self.state.pointIndex += 1
+                    if self.state.pointIndex >= self.state.pointCount:
+                        self._compute()
+                    else:
+                        self.state.state = "WAIT_HAND"
+                        self.state.currentTargetUv = self.state.targetsUv[self.state.pointIndex]
+                        self.state.samples = 0
+                        self.current_samples_mm = []
+                        self.stable_frames_count = 0
+                        self.state.message = f"Đã chốt điểm {self.state.pointIndex}! Chuyển sang điểm {self.state.pointIndex + 1}/{self.state.pointCount}"
                 else:
-                    self.state.message = "No samples to force capture."
+                    self.state.message = "LiDAR chưa thấy vật cản! Hãy đứng chân hoặc đặt vật cao hơn 5cm vào điểm ngắm."
         await self.force_broadcast()
         
     def _compute(self):

@@ -124,7 +124,14 @@ class DetectionService:
                 quad = lidar_conf.scanArea.quadMm
                 in_mask = filter_inside_quad(x_tf, y_tf, quad)
                 
-                valid_mask = fg_mask & in_mask
+                is_calibrating = (
+                    getattr(self, "calibration_service", None) is not None
+                    and self.calibration_service.state.state in ["WAIT_HAND", "CAPTURING"]
+                    and self.calibration_service.state.lidarId == lidar_conf.id
+                )
+                
+                # During calibration, allow any foreground cluster so unaligned scanArea doesn't block calibration
+                valid_mask = fg_mask if is_calibrating else (fg_mask & in_mask)
                 
                 # Broadcast raw points with flags
                 flags = np.zeros(len(x_tf), dtype=np.uint8)
@@ -158,11 +165,9 @@ class DetectionService:
                 )
                 
                 # Calibration / Raw Blobs mm
-                raw_blobs_mm = []
-                if len(cx) > 0:
-                    raw_blobs_mm = list(zip(cx, cy))
-                    if getattr(self, "calibration_service", None):
-                        asyncio.create_task(self.calibration_service.process_blobs(lidar_conf.id, raw_blobs_mm))
+                raw_blobs_mm = list(zip(cx, cy)) if len(cx) > 0 else []
+                if getattr(self, "calibration_service", None):
+                    asyncio.create_task(self.calibration_service.process_blobs(lidar_conf.id, raw_blobs_mm))
                     
                     # Map to UV using actual Homography or H0
                     H = None
