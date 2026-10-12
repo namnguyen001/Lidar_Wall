@@ -31,15 +31,17 @@ class OscOutputDriver:
         
         self.client.send_message("/wall/count", len(blobs))
         
-        for b in blobs:
-            self.client.send_message("/wall/blob", [
+        for i, b in enumerate(blobs):
+            payload = [
                 int(b["id"]),
                 float(b["x"]),
                 float(b["y"]),
                 float(b["sizeMm"]),
                 float(b["vx"]),
                 float(b["vy"])
-            ])
+            ]
+            self.client.send_message("/wall/blob", payload)
+            self.client.send_message(f"/wall/blob/{i}", payload)
             
     def send_up(self, blob_id: int):
         cfg = self.config_store.get_config().output.osc

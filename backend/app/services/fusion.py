@@ -66,11 +66,18 @@ class FusionService:
                 if len(u) == 0:
                     continue
                     
-                quad = np.array(lidar_conf.coverageUv)
-                in_mask = filter_inside_quad(u, v, quad)
+                active_lidars = [l for l in cfg.lidars if l.enabled]
+                if len(active_lidars) <= 1:
+                    # Single lidar: accept all detections within screen area (with slight margin)
+                    in_mask = (u >= -0.05) & (u <= 1.05) & (v >= -0.05) & (v <= 1.05)
+                else:
+                    quad = np.array(lidar_conf.coverageUv) if lidar_conf.coverageUv else np.array([[0,0],[1,0],[1,1],[0,1]])
+                    in_mask = filter_inside_quad(u, v, quad)
                 
-                all_u.extend(u[in_mask])
-                all_v.extend(v[in_mask])
+                u_valid = np.clip(u[in_mask], 0.0, 1.0)
+                v_valid = np.clip(v[in_mask], 0.0, 1.0)
+                all_u.extend(u_valid)
+                all_v.extend(v_valid)
                 all_sizes.extend(sizes[in_mask])
                 all_sources.extend([[lidar_conf.id]] * np.sum(in_mask))
             
@@ -119,31 +126,30 @@ class FusionService:
                 np.array(fused_u), np.array(fused_v), np.array(fused_sizes), time.time()
             )
             
-            if len(tracked) > 0:
-                blob_data = []
-                for tb in tracked:
-                    if tb.state == "active":
-                        blob_data.append({
-                            "id": tb.id,
-                            "u": round(tb.u, 4),
-                            "v": round(tb.v, 4),
-                            "sizeMm": round(tb.size_mm, 1),
-                            "vu": round(tb.vu, 4),
-                            "vv": round(tb.vv, 4),
-                            "state": tb.state,
-                            "ageFrames": tb.age_frames
-                        })
-                        
-                if len(blob_data) > 0:
-                    asyncio.create_task(self.ws_hub.broadcast_events({
-                        "v": 1, "type": "blobs", "ts": int(time.time()*1000),
-                        "data": {"blobs": blob_data}
-                    }))
-                
-                # Push to output manager (this runs synchronously and fast, or we could task it)
-                if getattr(self, 'output_manager', None):
-                    self.output_manager.process_blobs(blob_data, time.time())
-                
-                if self.zone_engine:
-                    active_blobs = [tb for tb in tracked if tb.state == "active"]
-                    asyncio.create_task(self.zone_engine.process_blobs(active_blobs, time.time()))
+            blob_data = []
+            for tb in tracked:
+                if tb.state == "active":
+                    blob_data.append({
+                        "id": tb.id,
+                        "u": round(float(tb.u), 4),
+                        "v": round(float(tb.v), 4),
+                        "sizeMm": round(float(tb.size_mm), 1),
+                        "vu": round(float(tb.vu), 4),
+                        "vv": round(float(tb.vv), 4),
+                        "state": tb.state,
+                        "ageFrames": tb.age_frames
+                    })
+                    
+            if len(blob_data) > 0:
+                asyncio.create_task(self.ws_hub.broadcast_events({
+                    "v": 1, "type": "blobs", "ts": int(time.time()*1000),
+                    "data": {"blobs": blob_data}
+                }))
+            
+            # ALWAYS push to output manager (even when empty) so OSC/TUIO can clear up blobs and emit heartbeat!
+            if getattr(self, 'output_manager', None):
+                self.output_manager.process_blobs(blob_data, time.time())
+            
+            if self.zone_engine:
+                active_blobs = [tb for tb in tracked if tb.state == "active"]
+                asyncio.create_task(self.zone_engine.process_blobs(active_blobs, time.time()))

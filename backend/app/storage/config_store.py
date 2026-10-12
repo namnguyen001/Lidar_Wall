@@ -45,3 +45,9 @@ class ConfigStore:
             
         os.replace(tmp_path, self.config_path)
         self.config = new_config
+
+    def save(self, new_config: LidarWallConfig | None = None):
+        if new_config is not None:
+            self.update_config(new_config)
+        elif self.config is not None:
+            self.update_config(self.config)

@@ -268,20 +268,44 @@ class CalibrationService:
     async def commit(self):
         async with self.lock:
             if self.state.state == "REVIEW" and self.state.result:
-                # Save to config
-                H, _, _ = compute_homography(self.state.capturedMm, self.state.targetsUv)
-                cfg = self.config_store.get_config()
-                lidar = next((l for l in cfg.lidars if l.id == self.state.lidarId), None)
-                if lidar:
-                    lidar.calibration.homography = H.tolist() if H is not None else None
-                    lidar.calibration.rmsPx = self.state.result.rmsPx
-                    lidar.calibration.targetsUv = self.state.targetsUv
-                    lidar.calibration.capturedMm = self.state.capturedMm
-                    lidar.calibration.createdAt = int(time.time() * 1000)
-                    self.config_store.save(cfg)
-                
-                self.state.state = "COMMITTED"
-                self.state.message = "Saved!"
+                try:
+                    # Save to config
+                    H, _, _ = compute_homography(self.state.capturedMm, self.state.targetsUv)
+                    cfg = self.config_store.get_config()
+                    lidar = next((l for l in cfg.lidars if l.id == self.state.lidarId), None)
+                    if lidar and H is not None:
+                        lidar.calibration.homography = H.tolist()
+                        lidar.calibration.rmsPx = self.state.result.rmsPx
+                        lidar.calibration.targetsUv = self.state.targetsUv
+                        lidar.calibration.capturedMm = self.state.capturedMm
+                        lidar.calibration.createdAt = int(time.time() * 1000)
+
+                        # Automatically update scanArea.quadMm to cover calibrated projection wall
+                        try:
+                            H_inv = np.linalg.inv(H)
+                            margin = 0.06 # 6% margin to catch touches on borders
+                            corners_uv = np.array([
+                                [-margin, -margin],
+                                [1.0 + margin, -margin],
+                                [1.0 + margin, 1.0 + margin],
+                                [-margin, 1.0 + margin]
+                            ], dtype=np.float32)
+                            wall_quad_mm = project(corners_uv, H_inv)
+                            lidar.scanArea.quadMm = wall_quad_mm.tolist()
+                            lidar.coverageUv = [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]
+                            logger.info(f"Updated scanArea.quadMm and coverageUv for lidar {self.state.lidarId}")
+                        except Exception as quad_err:
+                            logger.warning(f"Could not derive scanArea from H_inv: {quad_err}")
+
+                        self.config_store.save(cfg)
+                        logger.info(f"Calibration successfully saved to config for lidar {self.state.lidarId}")
+
+                    self.state.state = "COMMITTED"
+                    self.state.message = "Đã lưu thành công!"
+                except Exception as e:
+                    logger.error(f"Error in calibration commit: {e}", exc_info=True)
+                    self.state.message = f"Lỗi lưu cấu hình: {e}"
+                    raise e
         await self.force_broadcast()
         
     async def redo(self, point_index: int):

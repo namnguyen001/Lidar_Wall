@@ -122,15 +122,18 @@ class DetectionService:
                 
                 # Scan Area mask
                 quad = lidar_conf.scanArea.quadMm
-                in_mask = filter_inside_quad(x_tf, y_tf, quad)
+                if quad and len(quad) >= 4:
+                    in_mask = filter_inside_quad(x_tf, y_tf, quad)
+                else:
+                    in_mask = np.ones(len(x_tf), dtype=bool)
                 
                 is_calibrating = (
                     getattr(self, "calibration_service", None) is not None
-                    and self.calibration_service.state.state in ["WAIT_HAND", "CAPTURING"]
+                    and self.calibration_service.state.state in ["WAIT_HAND", "CAPTURING", "REVIEW"]
                     and self.calibration_service.state.lidarId == lidar_conf.id
                 )
                 
-                # During calibration, allow any foreground cluster so unaligned scanArea doesn't block calibration
+                # During calibration & review, allow any foreground cluster so unaligned scanArea doesn't block calibration
                 valid_mask = fg_mask if is_calibrating else (fg_mask & in_mask)
                 
                 # Broadcast raw points with flags

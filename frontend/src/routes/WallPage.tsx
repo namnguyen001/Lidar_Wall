@@ -174,14 +174,19 @@ export default function WallPage() {
   const cancelCal = () => api.post('/api/calibration/cancel', {}).catch(console.error)
   const commitCal = async () => {
     try {
-      await api.post('/api/calibration/commit', {})
+      const res = await api.post('/api/calibration/commit', {})
+      if (res.data) {
+        useWsStore.setState({ calibrationState: res.data })
+      }
       setShowTargetGuides(false)
       setTestMode(true)
       setSuccessToast('✓ Hiệu chuẩn thành công! Hãy bước chân vào sàn để test tương tác.')
       setTimeout(() => setSuccessToast(null), 6000)
       fetchConfig().then(setConfig).catch(console.error)
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to commit calibration:', err)
+      const msg = err?.response?.data?.detail || err?.message || 'Lỗi không xác định'
+      alert(`Không thể lưu cấu hình: ${msg}`)
     }
   }
   const captureCal = () => api.post('/api/calibration/capture', {}).catch(console.error)

@@ -12,7 +12,7 @@
       "id": "L1",
       "name": "YDLIDAR TEA (Ethernet)",
       "model": "ydlidar-tea",
-      "enabled": true,
+      "enabled": false,
       "connection": {
         "kind": "tcp",
         "host": "192.168.0.11",
@@ -136,20 +136,20 @@
       },
       "coverageUv": [
         [
-          0.1887298747763864,
-          0.17561121049493142
+          0.0,
+          0.0
         ],
         [
-          0.8284436602925145,
-          0.18578810398963924
+          1.0,
+          0.0
         ],
         [
-          0.8420393778301096,
-          0.8421983652526213
+          1.0,
+          1.0
         ],
         [
-          0.16583185076500306,
-          0.8371098942416393
+          0.0,
+          1.0
         ]
       ],
       "background": {
@@ -169,7 +169,7 @@
   ],
   "blob": {
     "clusterGapMm": 115.0,
-    "minPoints": 12,
+    "minPoints": 5,
     "minSizeMm": 30.0,
     "maxSizeMm": 300.0,
     "confirmFrames": 2,
@@ -210,7 +210,7 @@
       "rateHz": 60
     },
     "tuio": {
-      "enabled": false,
+      "enabled": true,
       "host": "127.0.0.1",
       "port": 3333,
       "rateHz": 60

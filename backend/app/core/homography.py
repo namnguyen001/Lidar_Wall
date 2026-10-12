@@ -34,9 +34,8 @@ def compute_homography(src_mm: list[tuple[float, float]], dst_uv: list[tuple[flo
     if H is None:
         return None, 0.0, 0.0
         
-    # Check determinant
-    det = np.linalg.det(H)
-    if abs(det) < 1e-6:
+    # Check rank / invertibility (avoid false-rejecting mm->UV transforms with scale-dependent small det)
+    if np.linalg.matrix_rank(H) < 3:
         return None, 0.0, 0.0
         
     # Check collinearity or bad mapping by projecting
