@@ -23,8 +23,10 @@ export default function WallPage() {
   const navigate = useNavigate()
   const calState = useWsStore((s) => s.calibrationState)
   const [blobs, setBlobs] = useState<any[]>([])
-  const [testMode, setTestMode] = useState(false)
+  const [testMode, setTestMode] = useState(true) // Default to TRUE so user can test immediately!
   const [showZones, setShowZones] = useState(false)
+  const [showTargetGuides, setShowTargetGuides] = useState(false)
+  const [successToast, setSuccessToast] = useState<string | null>(null)
   const [config, setConfig] = useState<any>(null)
   const [zoneStates, setZoneStates] = useState<Record<string, any>>({})
 
@@ -44,6 +46,10 @@ export default function WallPage() {
           setSelectedLidarId((prev) => prev || first.id)
           if (first?.coverageUv && first.coverageUv.length === 4) {
             setEditableTargets(safeInsetTargets(first.coverageUv.map((pt: any) => [pt[0], pt[1]])))
+          }
+          // If not calibrated yet, show target guides to help setup; otherwise start in test mode!
+          if (!first?.calibration?.homography) {
+            setShowTargetGuides(true)
           }
         }
       })
@@ -153,6 +159,7 @@ export default function WallPage() {
   // Start in-wall calibration
   const startCal = async () => {
     if (!selectedLidarId) return
+    setShowTargetGuides(true)
     try {
       await api.post('/api/calibration/start', {
         lidarId: selectedLidarId,
@@ -165,7 +172,18 @@ export default function WallPage() {
   }
 
   const cancelCal = () => api.post('/api/calibration/cancel', {}).catch(console.error)
-  const commitCal = () => api.post('/api/calibration/commit', {}).catch(console.error)
+  const commitCal = async () => {
+    try {
+      await api.post('/api/calibration/commit', {})
+      setShowTargetGuides(false)
+      setTestMode(true)
+      setSuccessToast('✓ Hiệu chuẩn thành công! Hãy bước chân vào sàn để test tương tác.')
+      setTimeout(() => setSuccessToast(null), 6000)
+      fetchConfig().then(setConfig).catch(console.error)
+    } catch (err) {
+      console.error('Failed to commit calibration:', err)
+    }
+  }
   const captureCal = () => api.post('/api/calibration/capture', {}).catch(console.error)
 
   const resetTargets = () => {
@@ -254,35 +272,50 @@ export default function WallPage() {
             {!isCalibrating && !isReview && (
               <>
                 <button
-                  onClick={startCal}
-                  className="px-5 py-2 bg-gradient-to-r from-cyan-500 to-teal-400 hover:brightness-110 text-navy-950 font-extrabold text-sm rounded-lg shadow-[0_0_20px_rgba(6,182,212,0.6)] transition active:scale-95"
+                  onClick={() => setShowTargetGuides((v) => !v)}
+                  className={`px-3.5 py-1.5 text-xs font-bold rounded-lg border transition shadow-sm ${
+                    showTargetGuides
+                      ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300'
+                      : 'bg-navy-800 hover:bg-navy-700 border-navy-600 text-slate-300'
+                  }`}
+                  title="Bật/tắt 4 điểm mục tiêu để căn chỉnh góc chiếu"
                 >
-                  ▶ Bắt đầu Calibrate
+                  {showTargetGuides ? '✕ Ẩn 4 góc' : '🎯 Căn 4 góc'}
                 </button>
-                <div className="flex items-center gap-1 bg-navy-950 px-2 py-1 rounded-lg border border-navy-700">
-                  <span className="text-[11px] text-slate-400 font-bold px-1">Căn 4 điểm:</span>
-                  <button
-                    onClick={() => scaleTargets(1.15)}
-                    className="px-2 py-0.5 bg-navy-800 hover:bg-navy-700 text-cyan-300 font-bold text-xs rounded border border-navy-600 transition"
-                    title="Mở rộng 4 điểm ra xa"
-                  >
-                    + Rộng
-                  </button>
-                  <button
-                    onClick={() => scaleTargets(0.85)}
-                    className="px-2 py-0.5 bg-navy-800 hover:bg-navy-700 text-cyan-300 font-bold text-xs rounded border border-navy-600 transition"
-                    title="Thu hẹp 4 điểm vào trong"
-                  >
-                    - Thu
-                  </button>
-                  <button
-                    onClick={resetTargets}
-                    className="px-2 py-0.5 bg-navy-800 hover:bg-navy-700 text-slate-300 text-xs rounded border border-navy-600 transition"
-                    title="Đặt lại vị trí chuẩn"
-                  >
-                    ↺ Mặc định
-                  </button>
-                </div>
+
+                <button
+                  onClick={startCal}
+                  className="px-4 py-1.5 bg-gradient-to-r from-cyan-500 to-teal-400 hover:brightness-110 text-navy-950 font-extrabold text-xs rounded-lg shadow-[0_0_20px_rgba(6,182,212,0.6)] transition active:scale-95"
+                >
+                  ▶ Calibrate 4 điểm
+                </button>
+
+                {showTargetGuides && (
+                  <div className="flex items-center gap-1 bg-navy-950 px-2 py-1 rounded-lg border border-navy-700">
+                    <span className="text-[11px] text-slate-400 font-bold px-1">Căn khung:</span>
+                    <button
+                      onClick={() => scaleTargets(1.15)}
+                      className="px-2 py-0.5 bg-navy-800 hover:bg-navy-700 text-cyan-300 font-bold text-xs rounded border border-navy-600 transition"
+                      title="Mở rộng 4 điểm ra xa"
+                    >
+                      + Rộng
+                    </button>
+                    <button
+                      onClick={() => scaleTargets(0.85)}
+                      className="px-2 py-0.5 bg-navy-800 hover:bg-navy-700 text-cyan-300 font-bold text-xs rounded border border-navy-600 transition"
+                      title="Thu hẹp 4 điểm vào trong"
+                    >
+                      - Thu
+                    </button>
+                    <button
+                      onClick={resetTargets}
+                      className="px-2 py-0.5 bg-navy-800 hover:bg-navy-700 text-slate-300 text-xs rounded border border-navy-600 transition"
+                      title="Đặt lại vị trí chuẩn"
+                    >
+                      ↺ Mặc định
+                    </button>
+                  </div>
+                )}
               </>
             )}
 
@@ -388,72 +421,82 @@ export default function WallPage() {
         </button>
       )}
 
-      {/* Polygon connecting 4 target points */}
-      <svg className="absolute inset-0 w-full h-full pointer-events-none z-10">
-        <polygon
-          points={activeTargets.map((p) => `${p[0] * 100}%,${p[1] * 100}%`).join(' ')}
-          stroke={isCalibrating ? 'rgba(6,182,212,0.8)' : 'rgba(249,115,22,0.7)'}
-          strokeWidth="3"
-          strokeDasharray={isCalibrating ? '10,10' : 'none'}
-          fill={isCalibrating ? 'rgba(6,182,212,0.08)' : 'rgba(249,115,22,0.06)'}
-        />
-      </svg>
-
-      {/* Guide text when in Setup/Editable mode */}
-      {!isCalibrating && !isReview && (
-        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-30 pointer-events-none text-center">
-          <div className="inline-block bg-navy-900/95 border border-cyan-500/50 px-6 py-2.5 rounded-full text-cyan-300 text-sm shadow-2xl backdrop-blur-md">
-            ✦ Dùng chuột kéo 4 điểm mục tiêu (hoặc bấm <strong>"+ Rộng / - Thu"</strong> ở trên) ➔ Bấm <strong>"▶ Bắt đầu Calibrate"</strong>
+      {/* Success Toast Banner */}
+      {successToast && (
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
+          <div className="bg-emerald-500/90 text-navy-950 font-black px-6 py-3 rounded-2xl shadow-[0_0_40px_rgba(16,185,129,0.8)] backdrop-blur-md text-base border-2 border-emerald-300 animate-bounce">
+            {successToast}
           </div>
         </div>
       )}
 
-      {/* 4 TARGET CIRCLES (Draggable when not capturing, Active targets when capturing) */}
-      <div className="absolute inset-0 z-30 pointer-events-none">
-        {activeTargets.map((t, i) => {
-          const isCurrent = isCalibrating && i === calState?.pointIndex
-          const isDone = isCalibrating && i < calState?.pointIndex
-          const canDrag = !isCalibrating
+      {/* Polygon & 4 Target Circles (Only shown when Calibrating or in Setup Mode) */}
+      {(isCalibrating || showTargetGuides) && (
+        <>
+          <svg className="absolute inset-0 w-full h-full pointer-events-none z-10">
+            <polygon
+              points={activeTargets.map((p) => `${p[0] * 100}%,${p[1] * 100}%`).join(' ')}
+              stroke={isCalibrating ? 'rgba(6,182,212,0.8)' : 'rgba(249,115,22,0.7)'}
+              strokeWidth="3"
+              strokeDasharray={isCalibrating ? '10,10' : 'none'}
+              fill={isCalibrating ? 'rgba(6,182,212,0.08)' : 'rgba(249,115,22,0.06)'}
+            />
+          </svg>
 
-          return (
-            <div
-              key={i}
-              onPointerDown={(e) => canDrag && handleTargetPointerDown(i, e)}
-              className={`absolute w-20 h-20 -ml-10 -mt-10 rounded-full border-4 flex items-center justify-center transition-transform select-none ${
-                canDrag
-                  ? 'pointer-events-auto cursor-grab active:cursor-grabbing hover:scale-110 shadow-[0_0_30px_rgba(6,182,212,0.7)]'
-                  : ''
-              } ${
-                isCurrent
-                  ? 'border-orange-500 bg-orange-500/30 shadow-[0_0_40px_rgba(249,115,22,1)] scale-125'
-                  : isDone
-                  ? 'border-green-500 bg-green-500/25 shadow-[0_0_25px_rgba(34,197,94,0.7)]'
-                  : canDrag
-                  ? 'border-cyan-400 bg-cyan-500/20'
-                  : 'border-slate-600 bg-transparent'
-              }`}
-              style={{ left: `${t[0] * 100}%`, top: `${t[1] * 100}%` }}
-            >
-              {/* Point number badge */}
-              <span className="font-extrabold text-2xl text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]">
-                {isDone ? '✓' : i + 1}
-              </span>
-
-              {/* Ping ring for current active point */}
-              {isCurrent && (
-                <div className="absolute inset-[-14px] rounded-full border-2 border-orange-400 animate-ping opacity-80" />
-              )}
-
-              {/* Helper badge under target */}
-              {canDrag && (
-                <span className="absolute -bottom-7 text-[12px] font-bold font-mono whitespace-nowrap bg-navy-950/90 text-cyan-300 px-2.5 py-0.5 rounded-full border border-cyan-500/60 shadow-lg">
-                  Điểm {i + 1} ({Math.round(t[0] * 100)}%, {Math.round(t[1] * 100)}%)
-                </span>
-              )}
+          {/* Guide text when in Setup/Editable mode */}
+          {!isCalibrating && !isReview && (
+            <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-30 pointer-events-none text-center">
+              <div className="inline-block bg-navy-900/95 border border-cyan-500/50 px-6 py-2.5 rounded-full text-cyan-300 text-sm shadow-2xl backdrop-blur-md">
+                ✦ Dùng chuột kéo 4 điểm mục tiêu (hoặc bấm <strong>"+ Rộng / - Thu"</strong> ở trên) ➔ Bấm <strong>"▶ Calibrate 4 điểm"</strong>
+              </div>
             </div>
-          )
-        })}
-      </div>
+          )}
+
+          {/* 4 TARGET CIRCLES */}
+          <div className="absolute inset-0 z-30 pointer-events-none">
+            {activeTargets.map((t, i) => {
+              const isCurrent = isCalibrating && i === calState?.pointIndex
+              const isDone = isCalibrating && i < calState?.pointIndex
+              const canDrag = !isCalibrating
+
+              return (
+                <div
+                  key={i}
+                  onPointerDown={(e) => canDrag && handleTargetPointerDown(i, e)}
+                  className={`absolute w-20 h-20 -ml-10 -mt-10 rounded-full border-4 flex items-center justify-center transition-transform select-none ${
+                    canDrag
+                      ? 'pointer-events-auto cursor-grab active:cursor-grabbing hover:scale-110 shadow-[0_0_30px_rgba(6,182,212,0.7)]'
+                      : ''
+                  } ${
+                    isCurrent
+                      ? 'border-orange-500 bg-orange-500/30 shadow-[0_0_40px_rgba(249,115,22,1)] scale-125'
+                      : isDone
+                      ? 'border-green-500 bg-green-500/25 shadow-[0_0_25px_rgba(34,197,94,0.7)]'
+                      : canDrag
+                      ? 'border-cyan-400 bg-cyan-500/20'
+                      : 'border-slate-600 bg-transparent'
+                  }`}
+                  style={{ left: `${t[0] * 100}%`, top: `${t[1] * 100}%` }}
+                >
+                  <span className="font-extrabold text-2xl text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]">
+                    {isDone ? '✓' : i + 1}
+                  </span>
+
+                  {isCurrent && (
+                    <div className="absolute inset-[-14px] rounded-full border-2 border-orange-400 animate-ping opacity-80" />
+                  )}
+
+                  {canDrag && (
+                    <span className="absolute -bottom-7 text-[12px] font-bold font-mono whitespace-nowrap bg-navy-950/90 text-cyan-300 px-2.5 py-0.5 rounded-full border border-cyan-500/60 shadow-lg">
+                      Điểm {i + 1} ({Math.round(t[0] * 100)}%, {Math.round(t[1] * 100)}%)
+                    </span>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </>
+      )}
 
       {/* Line and distance badge from detected hand/foot to current target */}
       {isCalibrating && calState?.handUv && calState?.currentTargetUv && (
@@ -571,26 +614,53 @@ export default function WallPage() {
         </svg>
       )}
 
-      {/* Test mode live blob crosshairs */}
+      {/* Test mode live interactive footprint ripples */}
       {testMode && !isCalibrating && (
         <div className="absolute inset-0 z-30 pointer-events-none">
-          <div className="absolute top-20 left-6 bg-navy-900/90 text-yellow-400 px-3.5 py-1.5 rounded-lg border border-yellow-500 font-mono text-xs shadow-lg">
-            TEST MODE (Phím T để ẩn | ESC để thoát)
+          {/* Subtle status indicator */}
+          <div className="absolute top-20 left-6 bg-navy-950/80 text-cyan-300 px-3.5 py-1.5 rounded-xl border border-cyan-500/40 font-mono text-xs shadow-xl backdrop-blur-md flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-green-400 animate-pulse" />
+            <span>ĐANG TEST TƯƠNG TÁC (Phím T để ẩn | ESC thoát)</span>
           </div>
-          {(Array.isArray(blobs) ? blobs : (blobs as any)?.blobs || []).map((b: any) => (
-            <div
-              key={b.id}
-              className="absolute w-8 h-8 -ml-4 -mt-4"
-              style={{ left: `${b.u * 100}%`, top: `${b.v * 100}%` }}
-            >
-              <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-cyan-400 opacity-80" />
-              <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-cyan-400 opacity-80" />
-              <div className="absolute inset-0 rounded-full border border-cyan-400 animate-ping opacity-50" />
-              <div className="absolute top-8 left-1/2 -translate-x-1/2 bg-navy-950/90 text-cyan-200 text-xs px-2.5 py-1 rounded-md border border-cyan-800 whitespace-nowrap shadow-md">
-                ID: {b.id} ({Math.round(b.u * 100)},{Math.round(b.v * 100)})
+
+          {(Array.isArray(blobs) ? blobs : (blobs as any)?.blobs || []).map((b: any) => {
+            const u = b.u !== undefined ? b.u : (b.x !== undefined ? b.x : 0.5)
+            const v = b.v !== undefined ? b.v : (b.y !== undefined ? b.y : 0.5)
+            const rPx = Math.max(35, Math.min(80, b.sizeMm ? b.sizeMm / 3.5 : 45))
+
+            return (
+              <div
+                key={b.id}
+                className="absolute transition-all duration-75 ease-out"
+                style={{
+                  left: `${u * 100}%`,
+                  top: `${v * 100}%`,
+                  transform: 'translate(-50%, -50%)',
+                }}
+              >
+                {/* Expanding pulse ripple */}
+                <div
+                  className="absolute inset-0 rounded-full border-2 border-cyan-400 animate-ping opacity-60"
+                  style={{ width: rPx * 2, height: rPx * 2, margin: -rPx }}
+                />
+
+                {/* Glowing neon halo ring */}
+                <div
+                  className="rounded-full bg-gradient-to-tr from-cyan-500/35 via-teal-400/25 to-blue-500/15 border-2 border-cyan-300 shadow-[0_0_40px_rgba(6,182,212,0.9)] flex items-center justify-center backdrop-blur-xs"
+                  style={{ width: rPx * 2, height: rPx * 2 }}
+                >
+                  {/* Inner bright core */}
+                  <div className="w-4 h-4 rounded-full bg-white shadow-[0_0_20px_#fff]" />
+                </div>
+
+                {/* Floating info badge */}
+                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-navy-950/95 text-cyan-200 text-xs font-bold px-3 py-1 rounded-full border border-cyan-500/60 whitespace-nowrap shadow-xl flex items-center gap-1.5 font-mono">
+                  <span className="w-2 h-2 rounded-full bg-green-400" />
+                  ID #{b.id} ({Math.round(u * 100)}%, {Math.round(v * 100)}%)
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
