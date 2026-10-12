@@ -155,8 +155,8 @@ class DetectionService:
                 # Blob config with overrides
                 blob_overrides = lidar_conf.overrides.get("blob", {})
                 cluster_gap_mm = blob_overrides.get("clusterGapMm", cfg.blob.clusterGapMm)
-                min_points = blob_overrides.get("minPoints", cfg.blob.minPoints)
-                min_size_mm = blob_overrides.get("minSizeMm", cfg.blob.minSizeMm)
+                min_points = 3 if is_calibrating else blob_overrides.get("minPoints", cfg.blob.minPoints)
+                min_size_mm = 20.0 if is_calibrating else blob_overrides.get("minSizeMm", cfg.blob.minSizeMm)
                 max_size_mm = blob_overrides.get("maxSizeMm", cfg.blob.maxSizeMm)
                 
                 cx, cy, sizes, _ = cluster_points(

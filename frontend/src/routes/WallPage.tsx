@@ -352,20 +352,29 @@ export default function WallPage() {
 
                 <button
                   onClick={captureCal}
-                  className={`px-4 py-1.5 font-bold text-xs rounded-lg shadow-md transition flex items-center gap-1.5 active:scale-95 cursor-pointer ${
+                  disabled={Boolean(calState.state === 'WAIT_HAND' && !calState.hasValidTouch)}
+                  className={`px-4 py-1.5 font-bold text-xs rounded-lg shadow-md transition flex items-center gap-1.5 active:scale-95 ${
                     calState.state === 'POINT_SAVED'
-                      ? 'bg-emerald-500 hover:bg-emerald-400 text-navy-950 font-black shadow-[0_0_20px_rgba(16,185,129,0.8)] animate-pulse'
+                      ? 'bg-emerald-500 hover:bg-emerald-400 text-navy-950 font-black shadow-[0_0_20px_rgba(16,185,129,0.8)] animate-pulse cursor-pointer'
                       : calState.state === 'CAPTURING'
-                      ? 'bg-amber-600 hover:bg-amber-500 text-white shadow-[0_0_15px_rgba(245,158,11,0.5)]'
-                      : 'bg-green-600 hover:bg-green-500 text-white shadow-[0_0_15px_rgba(34,197,94,0.5)]'
+                      ? 'bg-amber-600 hover:bg-amber-500 text-white shadow-[0_0_15px_rgba(245,158,11,0.5)] cursor-pointer'
+                      : calState.hasValidTouch
+                      ? 'bg-emerald-500 hover:bg-emerald-400 text-navy-950 font-black shadow-[0_0_20px_rgba(16,185,129,0.8)] animate-pulse cursor-pointer'
+                      : 'bg-navy-800 text-amber-400/80 border border-amber-500/40 cursor-not-allowed opacity-80'
                   }`}
-                  title="Bấm Space để thao tác"
+                  title={
+                    calState.state === 'WAIT_HAND' && !calState.hasValidTouch
+                      ? `Chưa có điểm chạm thực tế tại Điểm ${calState.pointIndex + 1}`
+                      : 'Bấm Space để thao tác'
+                  }
                 >
                   {calState.state === 'POINT_SAVED'
                     ? `⎵ Sang Điểm ${calState.pointIndex + 2} (Space)`
                     : calState.state === 'CAPTURING'
                     ? `⏳ Đang lấy mẫu ${calState.progressPct || 0}%...`
-                    : `⎵ Chốt Điểm ${calState.pointIndex + 1} (Space)`}
+                    : calState.hasValidTouch
+                    ? `⎵ Chốt Điểm ${calState.pointIndex + 1} (Space)`
+                    : `⏳ Chờ chạm tay vào Điểm ${calState.pointIndex + 1}...`}
                 </button>
                 <button
                   onClick={cancelCal}
@@ -478,6 +487,19 @@ export default function WallPage() {
               strokeDasharray={isCalibrating ? '10,10' : 'none'}
               fill={isCalibrating ? 'rgba(6,182,212,0.08)' : 'rgba(249,115,22,0.06)'}
             />
+
+            {/* Live connecting line from detected touch point to current target point */}
+            {isCalibrating && calState?.handUv && calState?.currentTargetUv && (
+              <line
+                x1={`${calState.handUv[0] * 100}%`}
+                y1={`${calState.handUv[1] * 100}%`}
+                x2={`${calState.currentTargetUv[0] * 100}%`}
+                y2={`${calState.currentTargetUv[1] * 100}%`}
+                stroke={calState.hasValidTouch ? '#10b981' : '#f59e0b'}
+                strokeWidth={calState.hasValidTouch ? '3.5' : '2'}
+                strokeDasharray="6,6"
+              />
+            )}
           </svg>
 
           {/* Guide text when in Setup/Editable mode */}
@@ -485,6 +507,77 @@ export default function WallPage() {
             <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-30 pointer-events-none text-center">
               <div className="inline-block bg-navy-900/95 border border-cyan-500/50 px-6 py-2.5 rounded-full text-cyan-300 text-sm shadow-2xl backdrop-blur-md">
                 ✦ Dùng chuột kéo 4 điểm mục tiêu (hoặc bấm <strong>"+ Rộng / - Thu"</strong> ở trên) ➔ Bấm <strong>"▶ Calibrate 4 điểm"</strong>
+              </div>
+            </div>
+          )}
+
+          {/* Live Connecting Line Distance Tag (Floating at midpoint) */}
+          {isCalibrating && calState?.handUv && calState?.currentTargetUv && (
+            <div
+              className="absolute pointer-events-none z-30 -translate-x-1/2 -translate-y-1/2 transition-all duration-75"
+              style={{
+                left: `${((calState.handUv[0] + calState.currentTargetUv[0]) / 2) * 100}%`,
+                top: `${((calState.handUv[1] + calState.currentTargetUv[1]) / 2) * 100}%`,
+              }}
+            >
+              <div
+                className={`px-3 py-1 rounded-full text-xs font-mono font-black border shadow-2xl backdrop-blur-md flex items-center gap-1.5 ${
+                  calState.hasValidTouch
+                    ? 'bg-emerald-950/95 text-emerald-300 border-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.7)] animate-bounce'
+                    : 'bg-navy-950/95 text-amber-300 border-amber-500/80 shadow-[0_0_15px_rgba(245,158,11,0.5)]'
+                }`}
+              >
+                <span>{calState.hasValidTouch ? '🟢 ĐÃ BẮT ĐIỂM:' : '🔴 KHOẢNG CÁCH:'}</span>
+                <span>{Math.round(calState.distancePx)}px</span>
+                {calState.hasValidTouch && (
+                  <span className="text-[10px] bg-emerald-500 text-navy-950 px-1.5 py-0.2 rounded font-black">
+                    BẤM SPACE
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Live Touch Point Marker (Shows where LiDAR sees hand/obstacle) */}
+          {isCalibrating && calState?.handUv && (
+            <div
+              className="absolute pointer-events-none z-30 -translate-x-1/2 -translate-y-1/2 transition-all duration-75"
+              style={{
+                left: `${calState.handUv[0] * 100}%`,
+                top: `${calState.handUv[1] * 100}%`,
+              }}
+            >
+              <div className="relative flex items-center justify-center">
+                {/* Expanding Pulse Ring */}
+                <div
+                  className={`absolute w-16 h-16 rounded-full border-2 animate-ping opacity-75 ${
+                    calState.hasValidTouch ? 'border-emerald-400' : 'border-amber-400'
+                  }`}
+                />
+                {/* Center Point */}
+                <div
+                  className={`w-8 h-8 rounded-full border-2 flex items-center justify-center shadow-lg ${
+                    calState.hasValidTouch
+                      ? 'bg-emerald-500 border-emerald-200 shadow-[0_0_25px_rgba(16,185,129,1)]'
+                      : 'bg-amber-500 border-amber-200 shadow-[0_0_20px_rgba(245,158,11,0.8)]'
+                  }`}
+                >
+                  <span className="text-[10px] font-black text-navy-950">
+                    {calState.hasValidTouch ? '✓' : '●'}
+                  </span>
+                </div>
+                {/* Label above */}
+                <div className="absolute -top-7 whitespace-nowrap">
+                  <span
+                    className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border shadow-md ${
+                      calState.hasValidTouch
+                        ? 'bg-emerald-950/90 text-emerald-300 border-emerald-500'
+                        : 'bg-navy-950/90 text-amber-300 border-amber-500'
+                    }`}
+                  >
+                    {calState.hasValidTouch ? 'Điểm chạm (Hợp lệ)' : 'Tọa độ LiDAR'}
+                  </span>
+                </div>
               </div>
             </div>
           )}
@@ -513,7 +606,9 @@ export default function WallPage() {
                     isDone
                       ? 'border-4 border-green-400 bg-green-500/30 shadow-[0_0_35px_rgba(34,197,94,0.8)] scale-110'
                       : isCurrent
-                      ? 'shadow-[0_0_50px_rgba(249,115,22,0.9)] scale-125'
+                      ? calState.hasValidTouch
+                        ? 'border-4 border-emerald-400 bg-emerald-500/25 shadow-[0_0_60px_rgba(16,185,129,1)] scale-125'
+                        : 'border-4 border-amber-500/80 bg-amber-500/10 shadow-[0_0_40px_rgba(245,158,11,0.7)] scale-115'
                       : !canDrag
                       ? 'border-4 border-slate-700/80 bg-navy-950/60 opacity-60'
                       : ''
@@ -535,7 +630,7 @@ export default function WallPage() {
                         cx="56"
                         cy="56"
                         r={r}
-                        stroke={progress >= 100 ? '#22c55e' : progress > 50 ? '#10b981' : '#f97316'}
+                        stroke={progress >= 100 ? '#22c55e' : progress > 50 ? '#10b981' : calState.hasValidTouch ? '#22c55e' : '#f97316'}
                         strokeWidth="6"
                         strokeDasharray={circ}
                         strokeDashoffset={strokeDashoffset}
@@ -548,13 +643,17 @@ export default function WallPage() {
 
                   {/* Inner Content */}
                   <div className="flex flex-col items-center justify-center relative z-10">
-                    <span className={`font-black tracking-wider drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)] ${
-                      isDone
-                        ? 'text-3xl text-green-300'
-                        : isCurrent
-                        ? 'text-3xl text-orange-200'
-                        : 'text-2xl text-slate-300'
-                    }`}>
+                    <span
+                      className={`font-black tracking-wider drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)] ${
+                        isDone
+                          ? 'text-3xl text-green-300'
+                          : isCurrent
+                          ? calState.hasValidTouch
+                            ? 'text-3xl text-emerald-200'
+                            : 'text-3xl text-amber-200'
+                          : 'text-2xl text-slate-300'
+                      }`}
+                    >
                       {isDone ? '✓' : i + 1}
                     </span>
 
@@ -567,7 +666,11 @@ export default function WallPage() {
 
                   {/* Pulsing ring when active */}
                   {isCurrent && progress < 100 && (
-                    <div className="absolute inset-[-12px] rounded-full border-2 border-orange-400 animate-ping opacity-60 pointer-events-none" />
+                    <div
+                      className={`absolute inset-[-12px] rounded-full border-2 animate-ping opacity-60 pointer-events-none ${
+                        calState.hasValidTouch ? 'border-emerald-400' : 'border-amber-400'
+                      }`}
+                    />
                   )}
 
                   {/* Subtitle / status badge underneath circle */}
@@ -577,18 +680,24 @@ export default function WallPage() {
                         ✓ ĐÃ LƯU ĐIỂM {i + 1}
                       </span>
                     ) : isCurrent ? (
-                      <span className={`text-[11px] font-bold font-mono px-3 py-1 rounded-full border shadow-xl ${
-                        calState.state === 'POINT_SAVED' || progress >= 100
-                          ? 'bg-green-600 text-white border-green-400 animate-bounce'
-                          : calState.state === 'CAPTURING'
-                          ? 'bg-amber-950/95 text-amber-300 border-amber-500 animate-pulse'
-                          : 'bg-navy-950/95 text-cyan-300 border-cyan-500'
-                      }`}>
+                      <span
+                        className={`text-[11px] font-bold font-mono px-3 py-1 rounded-full border shadow-xl ${
+                          calState.state === 'POINT_SAVED' || progress >= 100
+                            ? 'bg-green-600 text-white border-green-400 animate-bounce'
+                            : calState.state === 'CAPTURING'
+                            ? 'bg-amber-950/95 text-amber-300 border-amber-500 animate-pulse'
+                            : calState.hasValidTouch
+                            ? 'bg-emerald-950/95 text-emerald-300 border-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.7)] animate-bounce'
+                            : 'bg-navy-950/95 text-amber-300 border-amber-500'
+                        }`}
+                      >
                         {calState.state === 'POINT_SAVED' || progress >= 100
                           ? `✓ ĐÃ LƯU! BẤM SPACE ĐỂ SANG ĐIỂM TIẾP THEO`
                           : calState.state === 'CAPTURING'
                           ? `⏳ Đang lấy mẫu ${progress}% - Giữ yên!`
-                          : `🎯 Chạm tay rồi bấm Space`}
+                          : calState.hasValidTouch
+                          ? `🟢 ĐÃ BẮT ĐIỂM - BẤM SPACE ĐỂ LẤY MẪU`
+                          : `🎯 CHƯA CÓ ĐIỂM CHẠM - HÃY CHẠM VÀO ĐÂY`}
                       </span>
                     ) : canDrag ? (
                       <span className="text-[11px] font-bold font-mono bg-navy-950/90 text-cyan-300 px-2 py-0.5 rounded-full border border-cyan-500/60 shadow-lg">
@@ -610,10 +719,22 @@ export default function WallPage() {
       {/* Floating Calibration Status & Instructions Card */}
       {isCalibrating && (
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-30 pointer-events-none text-center max-w-xl w-full px-4">
-          <div className="bg-navy-950/95 border-2 border-cyan-500/60 rounded-2xl p-4 shadow-[0_0_50px_rgba(0,0,0,0.8)] backdrop-blur-md">
+          <div
+            className={`bg-navy-950/95 border-2 rounded-2xl p-4 shadow-[0_0_50px_rgba(0,0,0,0.8)] backdrop-blur-md transition-colors duration-200 ${
+              calState.hasValidTouch ? 'border-emerald-400/80 shadow-[0_0_30px_rgba(16,185,129,0.4)]' : 'border-cyan-500/60'
+            }`}
+          >
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-bold text-cyan-300 flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping inline-block" />
+              <span
+                className={`text-sm font-bold flex items-center gap-2 ${
+                  calState.hasValidTouch ? 'text-emerald-300' : 'text-cyan-300'
+                }`}
+              >
+                <span
+                  className={`w-2.5 h-2.5 rounded-full animate-ping inline-block ${
+                    calState.hasValidTouch ? 'bg-emerald-400' : 'bg-cyan-400'
+                  }`}
+                />
                 {calState?.message || `Chạm tay vào Điểm ${calState?.pointIndex + 1} rồi bấm Space`}
               </span>
               <span className="text-xs font-mono font-bold text-amber-400">
@@ -629,8 +750,8 @@ export default function WallPage() {
             </div>
 
             <div className="text-[11px] text-slate-400 mt-2 flex items-center justify-between">
-              <span>💡 Chạm vào điểm mục tiêu rồi bấm Space để lấy mẫu (0% ➔ 100%)</span>
-              <span>Đạt 100% bấm <kbd className="px-1.5 py-0.5 bg-navy-800 border border-slate-600 rounded text-slate-200 font-mono text-[10px]">Space</kbd> để sang điểm tiếp theo</span>
+              <span>💡 Chạm vào điểm mục tiêu để hiện 🟢 ĐÃ BẮT ĐIỂM rồi mới bấm Space</span>
+              <span>Đạt 100% bấm <kbd className="px-1.5 py-0.5 bg-navy-800 border border-slate-600 rounded text-slate-200 font-mono text-[10px]">Space</kbd> để sang điểm tiếp</span>
             </div>
           </div>
         </div>
