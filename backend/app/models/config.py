@@ -67,8 +67,8 @@ class CalibrationConfig(BaseModel):
     homography: list[list[float]] | None = None
     rmsPx: float | None = None
     createdAt: int | None = None
-    targetsUv: list[Point2] = []
-    capturedMm: list[list[Point2]] = []
+    targetsUv: list[Point2] | list[list[float]] = []
+    capturedMm: list[Point2] | list[list[float]] = []
 
 class LidarConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")

@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import time
 
 import numpy as np
@@ -7,6 +8,8 @@ from pydantic import BaseModel
 from app.core.homography import compute_h0, compute_homography, project
 from app.services.ws_hub import WsHub
 from app.storage.config_store import ConfigStore
+
+logger = logging.getLogger(__name__)
 
 
 class CalibrationResult(BaseModel):
@@ -291,8 +294,8 @@ class CalibrationService:
                                 [-margin, 1.0 + margin]
                             ], dtype=np.float32)
                             wall_quad_mm = project(corners_uv, H_inv)
-                            lidar.scanArea.quadMm = wall_quad_mm.tolist()
-                            lidar.coverageUv = [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]
+                            lidar.scanArea.quadMm = tuple((float(p[0]), float(p[1])) for p in wall_quad_mm)
+                            lidar.coverageUv = ((0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0))
                             logger.info(f"Updated scanArea.quadMm and coverageUv for lidar {self.state.lidarId}")
                         except Exception as quad_err:
                             logger.warning(f"Could not derive scanArea from H_inv: {quad_err}")
