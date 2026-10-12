@@ -71,10 +71,11 @@ class CalibrationService:
         self.last_ws_time = 0.0
         await self._broadcast_state()
 
-    async def start(self, lidar_id: str, targets_uv: list[list[float]], samples_needed: int = 30):
+    async def start(self, lidar_id: str, targets_uv: list[list[float]], samples_needed: int = 25):
         async with self.lock:
+            # If already active, restart cleanly instead of raising 409 Conflict
             if self.state.state not in ["IDLE", "COMMITTED", "CANCELLED", "FAILED"]:
-                raise ValueError("CALIBRATION_BUSY")
+                logger.info(f"Restarting calibration for lidar {lidar_id} (previous state: {self.state.state})")
                 
             cfg = self.config_store.get_config()
             lidar_conf = next((l for l in cfg.lidars if l.id == lidar_id), None)
