@@ -124,14 +124,14 @@ export default function WallPage() {
       }
 
       if (e.key === 'Escape') {
-        if (calState && ['WAIT_HAND', 'CAPTURING'].includes(calState.state)) {
+        if (calState && ['WAIT_HAND', 'CAPTURING', 'POINT_SAVED'].includes(calState.state)) {
           api.post('/api/calibration/cancel', {}).catch(console.error)
         }
         exitWall()
         return
       }
 
-      if (calState && ['WAIT_HAND', 'CAPTURING'].includes(calState.state)) {
+      if (calState && ['WAIT_HAND', 'CAPTURING', 'POINT_SAVED'].includes(calState.state)) {
         if (e.code === 'Space') {
           api.post('/api/calibration/capture', {}).catch(console.error)
         }
@@ -217,7 +217,7 @@ export default function WallPage() {
 
   // Pointer dragging for the 4 target points
   const handleTargetPointerDown = (idx: number, e: React.PointerEvent) => {
-    if (calState && ['WAIT_HAND', 'CAPTURING'].includes(calState.state)) return
+    if (calState && ['WAIT_HAND', 'CAPTURING', 'POINT_SAVED'].includes(calState.state)) return
     e.stopPropagation()
     e.preventDefault()
     setDraggingIdx(idx)
@@ -245,7 +245,7 @@ export default function WallPage() {
     }
   }
 
-  const isCalibrating = calState && ['WAIT_HAND', 'CAPTURING'].includes(calState.state)
+  const isCalibrating = calState && ['WAIT_HAND', 'CAPTURING', 'POINT_SAVED'].includes(calState.state)
   const isReview = calState && calState.state === 'REVIEW'
 
   // Current targets to render (from calState if calibrating, else editableTargets)

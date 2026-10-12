@@ -132,10 +132,9 @@ class CalibrationService:
                 self.state.handUv = None
                 self.state.distancePx = 9999.0
                 if self.state.state == "CAPTURING":
-                    # If we already have enough samples to finish, save the point
-                    if len(self.current_samples_mm) >= 15:
-                        self._finish_point()
-                    else:
+                    self.missing_frames_count = getattr(self, 'missing_frames_count', 0) + 1
+                    if self.missing_frames_count > 15:
+                        self.missing_frames_count = 0
                         self.state.state = "WAIT_HAND"
                         self.state.samples = 0
                         self.state.progressPct = 0
@@ -143,6 +142,8 @@ class CalibrationService:
                         self.state.message = f"Mất dấu điểm chạm! Hãy chạm lại vào Điểm {self.state.pointIndex + 1} rồi bấm Space."
                 await self._broadcast_state()
                 return
+
+            self.missing_frames_count = 0
 
             pts_mm = np.array(raw_blobs_mm)
             

@@ -129,7 +129,7 @@ class DetectionService:
                 
                 is_calibrating = (
                     getattr(self, "calibration_service", None) is not None
-                    and self.calibration_service.state.state in ["WAIT_HAND", "CAPTURING", "REVIEW"]
+                    and self.calibration_service.state.state in ["WAIT_HAND", "CAPTURING", "POINT_SAVED", "REVIEW"]
                     and self.calibration_service.state.lidarId == lidar_conf.id
                 )
                 
