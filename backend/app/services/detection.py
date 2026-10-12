@@ -64,11 +64,10 @@ class DetectionService:
             all_blobs_size = []
             
             for idx, lidar_conf in enumerate(cfg.lidars):
-                if not lidar_conf.enabled:
-                    continue
-                    
                 driver = self.lidar_manager.drivers.get(lidar_conf.id)
                 if not driver:
+                    continue
+                if driver.get_status().state != "connected" and not lidar_conf.enabled:
                     continue
                     
                 frame = driver.get_latest_frame()

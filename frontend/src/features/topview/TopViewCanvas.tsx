@@ -174,12 +174,15 @@ export default function TopViewCanvas() {
             const isFg = (f & 1) !== 0
             const isIn = (f & 2) !== 0
             
-            ctx.globalAlpha = (isFg && isIn ? 1 : isFg || isIn ? 0.65 : 0.25) * baseAlpha
-            ctx.fillStyle = isFg ? theme.rawPointForeground : theme.rawPointMuted
-            if (isFocus && isFg) ctx.fillStyle = theme.scanArea
+            ctx.globalAlpha = (isFg && isIn ? 1.0 : isFg || isIn ? 0.9 : 0.75) * baseAlpha
+            if (isFg) {
+              ctx.fillStyle = isFocus ? '#ef4444' : '#f97316'
+            } else {
+              ctx.fillStyle = isFocus ? '#0284c7' : '#64748b'
+            }
             
             const { x: cx, y: cy } = toCanvas(x, y, w, h, vp)
-            ctx.fillRect(cx - 1.5, cy - 1.5, 3, 3)
+            ctx.fillRect(cx - 2, cy - 2, 4, 4)
           }
 
           // Pass 2: Draw continuous lines (batched stroke)
@@ -190,7 +193,7 @@ export default function TopViewCanvas() {
             const y = pts[i+1]
             const { x: cx, y: cy } = toCanvas(x, y, w, h, vp)
             
-            if (drawing && Math.hypot(x - lastX, y - lastY) < 100) {
+            if (drawing && Math.hypot(x - lastX, y - lastY) < 150) {
               ctx.lineTo(cx, cy)
             } else {
               ctx.moveTo(cx, cy)
@@ -199,9 +202,9 @@ export default function TopViewCanvas() {
             lastX = x
             lastY = y
           }
-          ctx.strokeStyle = theme.rawPointMuted
-          ctx.globalAlpha = 0.3 * baseAlpha
-          ctx.lineWidth = 1
+          ctx.strokeStyle = isFocus ? 'rgba(2, 132, 199, 0.6)' : 'rgba(100, 116, 139, 0.4)'
+          ctx.globalAlpha = 0.7 * baseAlpha
+          ctx.lineWidth = 1.5
           ctx.stroke()
         })
         ctx.globalAlpha = 1

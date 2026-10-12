@@ -19,8 +19,15 @@ export default function LidarList() {
   })
 
   const toggle = async (id: string, st: string) => {
-    if (st === 'connected') await disconnectLidar(id)
-    else await connectLidar(id)
+    if (st === 'connected') {
+      await disconnectLidar(id)
+    } else {
+      await connectLidar(id)
+      const idx = lidars.findIndex((l: any) => l.id === id)
+      if (idx !== -1 && !lidars[idx].enabled) {
+        updateLidarConfig(idx, { enabled: true })
+      }
+    }
     refetch()
   }
 
