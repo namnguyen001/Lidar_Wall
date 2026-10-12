@@ -1,0 +1,60 @@
+export const en = {
+  tabs: {
+    lidar: "Lidar",
+    input: "Background & Input",
+    blob: "Blobs",
+    zones: "Zones",
+    output: "Output",
+    settings: "Settings"
+  },
+  lidar: {
+    title: "Lidar List",
+    add: "Add Lidar",
+    probe: "Probe Connection",
+    flipX: "Flip X",
+    flipY: "Flip Y",
+    rotation: "Rotation (Deg)",
+    offset: "Offset X/Y (mm)",
+    kind: "Device Type",
+    delete: "Delete",
+  },
+  input: {
+    bgLearning: "Background Learning",
+    progress: "Progress",
+    reLearn: "Re-learn Background",
+    tolerance: "Noise Tolerance (mm)",
+    minRange: "Min Range (mm)",
+    maxRange: "Max Range (mm)",
+  },
+  blob: {
+    clusterGap: "Cluster Gap (mm)",
+    minPoints: "Min Points",
+    minSize: "Min Size (mm)",
+    maxSize: "Max Size (mm)",
+    smoothing: "Smoothing (1Euro)",
+    lostFrames: "Lost Frames Tolerance",
+  },
+  output: {
+    osc: "OSC",
+    tuio: "TUIO",
+    ws: "WebSocket",
+    host: "Host (IP)",
+    port: "Port",
+    rate: "Send Rate (Hz)",
+    testSend: "Test Send",
+  },
+  settings: {
+    wallWidth: "Wall Width (px)",
+    wallHeight: "Wall Height (px)",
+    lang: "Language",
+    exportConfig: "Export Config",
+    importConfig: "Import Config",
+    presets: "Presets",
+    savePreset: "Save Preset",
+  },
+  common: {
+    disconnected: "BACKEND DISCONNECTED",
+    on: "ON",
+    off: "OFF",
+  }
+}

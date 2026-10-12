@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "wall": { "name": "Main wall", "widthPx": 1920, "heightPx": 1080, "widthMm": 4000, "heightMm": 2250 },
+  "lidars": [
+    {
+      "id": "L1",
+      "name": "YDLIDAR TEA (Ethernet)",
+      "model": "ydlidar-tea",
+      "enabled": true,
+      "connection": { "kind": "tcp", "host": "192.168.0.11", "port": 8090 },
+      "params": { "scanFreqHz": 10, "sampleRateKhz": 20, "minRangeMm": 100, "maxRangeMm": 8000, "singleChannel": false },
+      "transform": { "flipX": false, "flipY": false, "rotationDeg": 0, "offsetMm": [0, 0] },
+      "scanArea": { "mode": "free", "quadMm": [[-2000, 2500], [2000, 2500], [2000, 300], [-2000, 300]] },
+      "coverageUv": [[0.0, 0.0], [0.55, 0.0], [0.55, 1.0], [0.0, 1.0]],
+      "background": { "toleranceMm": 40, "learnScans": 60, "learnedAt": null },
+      "calibration": { "homography": null, "rmsPx": null, "createdAt": null, "targetsUv": [], "capturedMm": [] },
+      "overrides": {}
+    },
+    {
+      "id": "L2",
+      "name": "YDLIDAR G4 (COM3)",
+      "model": "ydlidar-g4",
+      "enabled": true,
+      "connection": { "kind": "serial", "port": "COM3", "baud": 230400 },
+      "params": { "scanFreqHz": 10, "sampleRateKhz": 9, "minRangeMm": 120, "maxRangeMm": 16000, "singleChannel": false },
+      "transform": { "flipX": false, "flipY": false, "rotationDeg": 0, "offsetMm": [0, 0] },
+      "scanArea": { "mode": "free", "quadMm": [[-2000, 2500], [2000, 2500], [2000, 300], [-2000, 300]] },
+      "coverageUv": [[0.45, 0.0], [1.0, 0.0], [1.0, 1.0], [0.45, 1.0]],
+      "background": { "toleranceMm": 40, "learnScans": 60, "learnedAt": null },
+      "calibration": { "homography": null, "rmsPx": null, "createdAt": null, "targetsUv": [], "capturedMm": [] },
+      "overrides": {}
+    }
+  ],
+  "blob": {
+    "clusterGapMm": 80, "minPoints": 2, "minSizeMm": 30, "maxSizeMm": 300,
+    "confirmFrames": 2, "lostFrames": 3, "maxMatchDistUv": 0.08, "smoothing": 0.4, "mergeRadiusMm": 60
+  },
+  "zones": [],
+  "output": {
+    "osc": { "enabled": true, "host": "127.0.0.1", "port": 9000, "rateHz": 60 },
+    "tuio": { "enabled": false, "host": "127.0.0.1", "port": 3333, "rateHz": 60 },
+    "ws": { "enabled": false, "port": 9100 },
+    "coordinate": { "space": "uv", "wallWidthPx": 1920, "wallHeightPx": 1080, "flipY": false }
+  },
+  "ui": { "language": "vi", "theme": "light", "wallTheme": "dark", "topView": { "rangeMm": 6000 } }
+}

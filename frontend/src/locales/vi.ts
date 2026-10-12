@@ -1,0 +1,60 @@
+export const vi = {
+  tabs: {
+    lidar: "Lidar",
+    input: "Nền & Input",
+    blob: "Blobs",
+    zones: "Zones",
+    output: "Output",
+    settings: "Cài đặt"
+  },
+  lidar: {
+    title: "Danh sách Lidar",
+    add: "Thêm Lidar",
+    probe: "Dò Kết Nối",
+    flipX: "Lật X",
+    flipY: "Lật Y",
+    rotation: "Xoay (Độ)",
+    offset: "Độ dời X/Y (mm)",
+    kind: "Loại thiết bị",
+    delete: "Xoá",
+  },
+  input: {
+    bgLearning: "Học nền",
+    progress: "Tiến độ",
+    reLearn: "Học lại nền",
+    tolerance: "Dung sai nhiễu (mm)",
+    minRange: "Khoảng cách tối thiểu (mm)",
+    maxRange: "Khoảng cách tối đa (mm)",
+  },
+  blob: {
+    clusterGap: "Khoảng cách gộp (mm)",
+    minPoints: "Số điểm tối thiểu",
+    minSize: "Kích thước tối thiểu (mm)",
+    maxSize: "Kích thước tối đa (mm)",
+    smoothing: "Độ mượt (1Euro Filter)",
+    lostFrames: "Số khung hình mất tăm (Lost Frames)",
+  },
+  output: {
+    osc: "OSC",
+    tuio: "TUIO",
+    ws: "WebSocket",
+    host: "Host (IP)",
+    port: "Port",
+    rate: "Tần số gửi (Hz)",
+    testSend: "Gửi Thử",
+  },
+  settings: {
+    wallWidth: "Chiều rộng tường (px)",
+    wallHeight: "Chiều cao tường (px)",
+    lang: "Ngôn ngữ",
+    exportConfig: "Xuất Config",
+    importConfig: "Nhập Config",
+    presets: "Presets",
+    savePreset: "Lưu Preset",
+  },
+  common: {
+    disconnected: "MẤT KẾT NỐI BACKEND",
+    on: "BẬT",
+    off: "TẮT",
+  }
+}

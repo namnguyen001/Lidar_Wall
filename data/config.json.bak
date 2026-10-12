@@ -1,0 +1,237 @@
+{
+  "version": 1,
+  "wall": {
+    "name": "Main wall",
+    "widthPx": 1920,
+    "heightPx": 1080,
+    "widthMm": 4000.0,
+    "heightMm": 2250.0
+  },
+  "lidars": [
+    {
+      "id": "L1",
+      "name": "YDLIDAR TEA (Ethernet)",
+      "model": "ydlidar-tea",
+      "enabled": true,
+      "connection": {
+        "kind": "tcp",
+        "host": "192.168.0.11",
+        "port": 8090
+      },
+      "params": {
+        "scanFreqHz": 10,
+        "sampleRateKhz": 20,
+        "minRangeMm": 100,
+        "maxRangeMm": 8000,
+        "singleChannel": false
+      },
+      "transform": {
+        "flipX": false,
+        "flipY": false,
+        "rotationDeg": 0.0,
+        "offsetMm": [
+          0.0,
+          0.0
+        ]
+      },
+      "scanArea": {
+        "mode": "free",
+        "quadMm": [
+          [
+            -2000.0,
+            2500.0
+          ],
+          [
+            2000.0,
+            2500.0
+          ],
+          [
+            2000.0,
+            300.0
+          ],
+          [
+            -2000.0,
+            300.0
+          ]
+        ]
+      },
+      "coverageUv": [
+        [
+          0.0,
+          0.0
+        ],
+        [
+          0.55,
+          0.0
+        ],
+        [
+          0.55,
+          1.0
+        ],
+        [
+          0.0,
+          1.0
+        ]
+      ],
+      "background": {
+        "toleranceMm": 40.0,
+        "learnScans": 60,
+        "learnedAt": null
+      },
+      "calibration": {
+        "homography": null,
+        "rmsPx": null,
+        "createdAt": null,
+        "targetsUv": [],
+        "capturedMm": []
+      },
+      "overrides": {}
+    },
+    {
+      "id": "L2",
+      "name": "YDLIDAR G4 (COM3)",
+      "model": "ydlidar-g4",
+      "enabled": true,
+      "connection": {
+        "kind": "serial",
+        "port": "COM3",
+        "baud": 230400
+      },
+      "params": {
+        "scanFreqHz": 10,
+        "sampleRateKhz": 9,
+        "minRangeMm": 120,
+        "maxRangeMm": 16000,
+        "singleChannel": false
+      },
+      "transform": {
+        "flipX": false,
+        "flipY": false,
+        "rotationDeg": 0.0,
+        "offsetMm": [
+          0.0,
+          0.0
+        ]
+      },
+      "scanArea": {
+        "mode": "free",
+        "quadMm": [
+          [
+            -1224.4305061144441,
+            568.0980957458833
+          ],
+          [
+            1707.4188039481273,
+            78.23791216209128
+          ],
+          [
+            1512.5382902720119,
+            -2197.02012685492
+          ],
+          [
+            -1624.0300053263102,
+            -1685.264158386016
+          ]
+        ]
+      },
+      "coverageUv": [
+        [
+          0.1887298747763864,
+          0.17561121049493142
+        ],
+        [
+          0.8470483005366727,
+          0.1934207862424841
+        ],
+        [
+          0.8420393778301096,
+          0.8421983652526213
+        ],
+        [
+          0.16583185076500306,
+          0.8371098942416393
+        ]
+      ],
+      "background": {
+        "toleranceMm": 40.0,
+        "learnScans": 60,
+        "learnedAt": null
+      },
+      "calibration": {
+        "homography": null,
+        "rmsPx": null,
+        "createdAt": null,
+        "targetsUv": [],
+        "capturedMm": []
+      },
+      "overrides": {}
+    }
+  ],
+  "blob": {
+    "clusterGapMm": 115.0,
+    "minPoints": 12,
+    "minSizeMm": 30.0,
+    "maxSizeMm": 300.0,
+    "confirmFrames": 2,
+    "lostFrames": 3,
+    "maxMatchDistUv": 0.08,
+    "smoothing": 0.4,
+    "mergeRadiusMm": 60.0
+  },
+  "zones": [
+    {
+      "id": "zone_lk8oyno",
+      "name": "New Zone",
+      "enabled": true,
+      "layer": 0,
+      "color": "#0891b2",
+      "shape": {
+        "type": "rect",
+        "x": 0.19270420213109987,
+        "y": 0.18075100785637596,
+        "w": 0.6471054827032064,
+        "h": 0.659663048836513
+      },
+      "trigger": "enter",
+      "dwellMs": 0,
+      "repeatMs": 0,
+      "minBlobs": 1,
+      "cooldownMs": 0,
+      "hysteresisUv": 0.005,
+      "exclusiveGroup": null,
+      "output": {}
+    }
+  ],
+  "output": {
+    "osc": {
+      "enabled": true,
+      "host": "127.0.0.1",
+      "port": 9000,
+      "rateHz": 60
+    },
+    "tuio": {
+      "enabled": false,
+      "host": "127.0.0.1",
+      "port": 3333,
+      "rateHz": 60
+    },
+    "ws": {
+      "enabled": false,
+      "port": 9100
+    },
+    "coordinate": {
+      "space": "uv",
+      "wallWidthPx": 1920,
+      "wallHeightPx": 1080,
+      "flipY": false
+    }
+  },
+  "ui": {
+    "language": "vi",
+    "theme": "light",
+    "wallTheme": "dark",
+    "topView": {
+      "rangeMm": 6000
+    }
+  }
+}
