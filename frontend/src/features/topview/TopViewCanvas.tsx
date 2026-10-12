@@ -21,6 +21,13 @@ export default function TopViewCanvas() {
   const [activeLidarId, setActiveLidarId] = useState<string | null>(null)
   const [editingArea, setEditingArea] = useState<any>(null) // null or copy of quadMm
   const [hoverHandle, setHoverHandle] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (!activeLidarId && config?.lidars?.length > 0) {
+      const firstEnabled = config.lidars.find((l: any) => l.enabled) || config.lidars[0]
+      if (firstEnabled) setActiveLidarId(firstEnabled.id)
+    }
+  }, [config, activeLidarId])
   
   // Refs for loop
   const pointsRef = useRef<Record<string, Array<{ pts: Float32Array, flags: Uint8Array, ts: number }>>>({})
@@ -252,32 +259,41 @@ export default function TopViewCanvas() {
         ctx.stroke()
         
         // Handles
+        const CORNER_NAMES = ['1 (TL)', '2 (TR)', '3 (BR)', '4 (BL)']
         for (let i = 0; i < 4; i++) {
           const { x, y } = toCanvas(editingArea[i][0], editingArea[i][1], w, h, vp)
           const isHover = hoverHandle === i || mouseRef.current.dragHandle === i
           ctx.beginPath()
-          ctx.arc(x, y, isHover ? 8 : 6, 0, Math.PI*2)
+          ctx.arc(x, y, isHover ? 9 : 7, 0, Math.PI*2)
           ctx.fillStyle = isHover ? theme.scanArea : '#FFFFFF'
           ctx.fill()
           ctx.lineWidth = 2.5
           ctx.strokeStyle = '#000000'
           ctx.stroke()
           ctx.beginPath()
-          ctx.arc(x, y, isHover ? 5 : 3.5, 0, Math.PI*2)
+          ctx.arc(x, y, isHover ? 6 : 4, 0, Math.PI*2)
           ctx.lineWidth = 1.5
           ctx.strokeStyle = isHover ? '#FFFFFF' : theme.scanArea
           ctx.stroke()
+
+          // Corner label
+          ctx.fillStyle = theme.ringLabel
+          ctx.font = 'bold 11px "JetBrains Mono", monospace'
+          ctx.fillText(CORNER_NAMES[i], x + 10, y + 4)
         }
       } else if (config?.lidars) {
-        // Draw static scan areas
+        // Draw static scan areas (only active/enabled lidars)
+        const CORNER_NAMES = ['1 (Trên-Trái)', '2 (Trên-Phải)', '3 (Dưới-Phải)', '4 (Dưới-Trái)']
         for (let i = 0; i < config.lidars.length; i++) {
-          const quad = config.lidars[i].scanArea.quadMm
-          if (!quad) continue
+          const l = config.lidars[i]
+          if (l.enabled === false) continue
+          const quad = l.scanArea?.quadMm
+          if (!quad || quad.length < 4) continue
           
-          const isFocus = i === activeLidarIdx
-          ctx.strokeStyle = theme.scanArea
-          ctx.globalAlpha = isFocus ? 1 : 0.42
-          ctx.lineWidth = 2
+          const isFocus = i === activeLidarIdx || l.id === activeLidarId
+          ctx.strokeStyle = isFocus ? theme.scanArea : 'rgba(234, 88, 12, 0.4)'
+          ctx.fillStyle = isFocus ? theme.scanFill : 'transparent'
+          ctx.lineWidth = isFocus ? 2.5 : 1.5
           
           ctx.beginPath()
           for (let j = 0; j < 4; j++) {
@@ -286,8 +302,44 @@ export default function TopViewCanvas() {
             else ctx.lineTo(x, y)
           }
           ctx.closePath()
+          if (isFocus) ctx.fill()
           ctx.stroke()
-          ctx.globalAlpha = 1
+
+          // Draw corner dots & labels for active arena
+          if (isFocus) {
+            for (let j = 0; j < 4; j++) {
+              const { x, y } = toCanvas(quad[j][0], quad[j][1], w, h, vp)
+              ctx.beginPath()
+              ctx.arc(x, y, 5, 0, Math.PI * 2)
+              ctx.fillStyle = theme.scanArea
+              ctx.fill()
+              ctx.lineWidth = 1.5
+              ctx.strokeStyle = '#FFFFFF'
+              ctx.stroke()
+
+              ctx.fillStyle = theme.ringLabel
+              ctx.font = 'bold 11px "JetBrains Mono", monospace'
+              ctx.fillText(CORNER_NAMES[j], x + 8, y + 4)
+            }
+
+            // Center label with dimensions
+            const midX = (quad[0][0] + quad[1][0] + quad[2][0] + quad[3][0]) / 4
+            const midY = (quad[0][1] + quad[1][1] + quad[2][1] + quad[3][1]) / 4
+            const { x: cx, y: cy } = toCanvas(midX, midY, w, h, vp)
+
+            ctx.save()
+            ctx.fillStyle = theme.scanArea
+            ctx.font = 'bold 12px "JetBrains Mono", monospace'
+            ctx.textAlign = 'center'
+            ctx.fillText(`VÙNG QUÉT (ARENA) - ${l.name || l.id}`, cx, cy - 8)
+
+            const wMm = Math.round(Math.hypot(quad[1][0] - quad[0][0], quad[1][1] - quad[0][1]))
+            const hMm = Math.round(Math.hypot(quad[3][0] - quad[0][0], quad[3][1] - quad[0][1]))
+            ctx.font = '10px "JetBrains Mono", monospace'
+            ctx.fillStyle = theme.ringLabel
+            ctx.fillText(`${wMm} mm × ${hMm} mm`, cx, cy + 10)
+            ctx.restore()
+          }
         }
       }
       

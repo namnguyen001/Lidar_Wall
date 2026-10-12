@@ -11,6 +11,13 @@ const DEFAULT_TARGETS: Array<[number, number]> = [
   [0.20, 0.75], // 4: Bottom-Left
 ]
 
+const TARGET_NAMES = [
+  'Góc Trên-Trái (1)',
+  'Góc Trên-Phải (2)',
+  'Góc Dưới-Phải (3)',
+  'Góc Dưới-Trái (4)',
+]
+
 function safeInsetTargets(pts: Array<[number, number]>): Array<[number, number]> {
   return pts.map(([u, v]) => {
     const safeU = Math.max(0.08, Math.min(0.92, u <= 0.05 ? 0.18 : (u >= 0.95 ? 0.82 : u)))
@@ -326,18 +333,42 @@ export default function WallPage() {
 
             {isCalibrating && (
               <>
-                <span className="text-sm font-bold text-orange-400 bg-orange-500/10 border border-orange-500/30 px-3 py-1.5 rounded-lg animate-pulse">
-                  Đang lấy Điểm {calState.pointIndex + 1}/{calState.pointCount}
-                </span>
+                <div className="flex items-center gap-3 bg-navy-900/90 border border-orange-500/40 px-3.5 py-1 rounded-xl shadow-lg backdrop-blur-md">
+                  <div className="flex flex-col">
+                    <span className="text-xs font-bold text-orange-400">
+                      🎯 Điểm {calState.pointIndex + 1}/{calState.pointCount}: {TARGET_NAMES[calState.pointIndex] || ''}
+                    </span>
+                    <div className="w-32 h-1.5 bg-navy-950 rounded-full overflow-hidden mt-1 border border-orange-500/30">
+                      <div
+                        className="h-full bg-gradient-to-r from-orange-500 via-amber-400 to-green-400 transition-all duration-150"
+                        style={{ width: `${calState.progressPct || 0}%` }}
+                      />
+                    </div>
+                  </div>
+                  <span className="text-xs font-mono font-bold text-amber-300">
+                    {calState.progressPct || 0}%
+                  </span>
+                </div>
+
                 <button
                   onClick={captureCal}
-                  className="px-4 py-1.5 bg-green-600 hover:bg-green-500 text-white font-bold text-xs rounded-lg shadow-md transition"
+                  disabled={(calState.progressPct || 0) < 30 && calState.samples < 10}
+                  className={`px-4 py-1.5 font-bold text-xs rounded-lg shadow-md transition flex items-center gap-1.5 ${
+                    (calState.progressPct || 0) >= 30 || calState.samples >= 10
+                      ? 'bg-green-600 hover:bg-green-500 text-white cursor-pointer active:scale-95 shadow-[0_0_15px_rgba(34,197,94,0.5)]'
+                      : 'bg-navy-800 text-slate-500 cursor-not-allowed border border-navy-700'
+                  }`}
+                  title={
+                    (calState.progressPct || 0) >= 30
+                      ? 'Chốt điểm này'
+                      : 'Đang đợi lấy mẫu ổn định (đạt ít nhất 30%)'
+                  }
                 >
                   ⎵ Chốt điểm (Space)
                 </button>
                 <button
                   onClick={cancelCal}
-                  className="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-lg shadow-md transition"
+                  className="px-3 py-1.5 bg-red-600/90 hover:bg-red-500 text-white font-bold text-xs rounded-lg shadow-md transition"
                 >
                   ✕ Hủy
                 </button>
@@ -461,41 +492,113 @@ export default function WallPage() {
           <div className="absolute inset-0 z-30 pointer-events-none">
             {activeTargets.map((t, i) => {
               const isCurrent = isCalibrating && i === calState?.pointIndex
-              const isDone = isCalibrating && i < calState?.pointIndex
-              const canDrag = !isCalibrating
+              const isDone = isCalibrating && (i < calState?.pointIndex || (calState?.savedPoints || []).includes(i))
+              const canDrag = !isCalibrating && !isReview
+              const progress = isCurrent ? (calState?.progressPct || 0) : isDone ? 100 : 0
+
+              const r = 44
+              const circ = 2 * Math.PI * r
+              const strokeDashoffset = circ - (progress / 100) * circ
 
               return (
                 <div
                   key={i}
                   onPointerDown={(e) => canDrag && handleTargetPointerDown(i, e)}
-                  className={`absolute w-20 h-20 -ml-10 -mt-10 rounded-full border-4 flex items-center justify-center transition-transform select-none ${
+                  className={`absolute w-24 h-24 -ml-12 -mt-12 rounded-full flex flex-col items-center justify-center transition-all duration-200 select-none ${
                     canDrag
-                      ? 'pointer-events-auto cursor-grab active:cursor-grabbing hover:scale-110 shadow-[0_0_30px_rgba(6,182,212,0.7)]'
+                      ? 'pointer-events-auto cursor-grab active:cursor-grabbing hover:scale-110 shadow-[0_0_30px_rgba(6,182,212,0.7)] border-4 border-cyan-400 bg-cyan-500/20'
                       : ''
                   } ${
-                    isCurrent
-                      ? 'border-orange-500 bg-orange-500/30 shadow-[0_0_40px_rgba(249,115,22,1)] scale-125'
-                      : isDone
-                      ? 'border-green-500 bg-green-500/25 shadow-[0_0_25px_rgba(34,197,94,0.7)]'
-                      : canDrag
-                      ? 'border-cyan-400 bg-cyan-500/20'
-                      : 'border-slate-600 bg-transparent'
+                    isDone
+                      ? 'border-4 border-green-400 bg-green-500/30 shadow-[0_0_35px_rgba(34,197,94,0.8)] scale-110'
+                      : isCurrent
+                      ? 'shadow-[0_0_50px_rgba(249,115,22,0.9)] scale-125'
+                      : !canDrag
+                      ? 'border-4 border-slate-700/80 bg-navy-950/60 opacity-60'
+                      : ''
                   }`}
                   style={{ left: `${t[0] * 100}%`, top: `${t[1] * 100}%` }}
                 >
-                  <span className="font-extrabold text-2xl text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]">
-                    {isDone ? '✓' : i + 1}
-                  </span>
-
+                  {/* Circular SVG Progress Ring for Active Point */}
                   {isCurrent && (
-                    <div className="absolute inset-[-14px] rounded-full border-2 border-orange-400 animate-ping opacity-80" />
+                    <svg className="absolute -inset-2 w-28 h-28 -rotate-90 pointer-events-none">
+                      <circle
+                        cx="56"
+                        cy="56"
+                        r={r}
+                        stroke="rgba(255,255,255,0.15)"
+                        strokeWidth="6"
+                        fill="none"
+                      />
+                      <circle
+                        cx="56"
+                        cy="56"
+                        r={r}
+                        stroke={progress >= 100 ? '#22c55e' : progress > 50 ? '#10b981' : '#f97316'}
+                        strokeWidth="6"
+                        strokeDasharray={circ}
+                        strokeDashoffset={strokeDashoffset}
+                        strokeLinecap="round"
+                        fill="none"
+                        className="transition-all duration-150"
+                      />
+                    </svg>
                   )}
 
-                  {canDrag && (
-                    <span className="absolute -bottom-7 text-[12px] font-bold font-mono whitespace-nowrap bg-navy-950/90 text-cyan-300 px-2.5 py-0.5 rounded-full border border-cyan-500/60 shadow-lg">
-                      Điểm {i + 1} ({Math.round(t[0] * 100)}%, {Math.round(t[1] * 100)}%)
+                  {/* Inner Content */}
+                  <div className="flex flex-col items-center justify-center relative z-10">
+                    <span className={`font-black tracking-wider drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)] ${
+                      isDone
+                        ? 'text-3xl text-green-300'
+                        : isCurrent
+                        ? 'text-3xl text-orange-200'
+                        : 'text-2xl text-slate-300'
+                    }`}>
+                      {isDone ? '✓' : i + 1}
                     </span>
+
+                    {isCurrent && progress > 0 && progress < 100 && (
+                      <span className="text-[11px] font-mono font-black text-amber-300 bg-navy-950/90 px-1.5 py-0.2 rounded mt-0.5 border border-amber-400/50">
+                        {progress}%
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Pulsing ring when active */}
+                  {isCurrent && progress < 100 && (
+                    <div className="absolute inset-[-12px] rounded-full border-2 border-orange-400 animate-ping opacity-60 pointer-events-none" />
                   )}
+
+                  {/* Subtitle / status badge underneath circle */}
+                  <div className="absolute -bottom-8 pointer-events-none whitespace-nowrap z-20">
+                    {isDone ? (
+                      <span className="text-[11px] font-bold font-mono bg-green-950/90 text-green-300 px-2.5 py-0.5 rounded-full border border-green-500/70 shadow-lg">
+                        ✓ ĐÃ LƯU ĐIỂM {i + 1}
+                      </span>
+                    ) : isCurrent ? (
+                      <span className={`text-[11px] font-bold font-mono px-3 py-1 rounded-full border shadow-xl ${
+                        progress >= 100
+                          ? 'bg-green-600 text-white border-green-400 animate-bounce'
+                          : progress > 0
+                          ? 'bg-amber-950/95 text-amber-300 border-amber-500 animate-pulse'
+                          : 'bg-navy-950/95 text-cyan-300 border-cyan-500'
+                      }`}>
+                        {progress >= 100
+                          ? `✓ ĐÃ XONG! BƯỚC SANG ĐIỂM TIẾP THEO`
+                          : progress > 0
+                          ? `⏳ Đang lấy mẫu ${progress}% - Giữ yên!`
+                          : `🎯 Đặt chân vào đây`}
+                      </span>
+                    ) : canDrag ? (
+                      <span className="text-[11px] font-bold font-mono bg-navy-950/90 text-cyan-300 px-2 py-0.5 rounded-full border border-cyan-500/60 shadow-lg">
+                        Điểm {i + 1} ({Math.round(t[0] * 100)}%, {Math.round(t[1] * 100)}%)
+                      </span>
+                    ) : (
+                      <span className="text-[11px] font-mono text-slate-500">
+                        Điểm {i + 1}
+                      </span>
+                    )}
+                  </div>
                 </div>
               )
             })}
@@ -503,34 +606,33 @@ export default function WallPage() {
         </>
       )}
 
-      {/* Line and distance badge from detected hand/foot to current target */}
-      {isCalibrating && calState?.handUv && calState?.currentTargetUv && (
-        <>
-          <svg className="absolute inset-0 w-full h-full pointer-events-none z-25">
-            <line
-              x1={`${calState.handUv[0] * 100}%`}
-              y1={`${calState.handUv[1] * 100}%`}
-              x2={`${calState.currentTargetUv[0] * 100}%`}
-              y2={`${calState.currentTargetUv[1] * 100}%`}
-              stroke="var(--accent-cyan)"
-              strokeWidth="4"
-              strokeDasharray="10, 10"
-              className="opacity-90 animate-pulse"
-            />
-          </svg>
-          <div
-            className="absolute -ml-20 mt-8 bg-navy-950/95 border-2 border-cyan-400 text-cyan-200 px-4 py-2 rounded-xl text-base font-bold font-mono pointer-events-none whitespace-nowrap backdrop-blur-md shadow-2xl z-30"
-            style={{ left: `${calState.handUv[0] * 100}%`, top: `${calState.handUv[1] * 100}%` }}
-          >
-            {calState.state === 'CAPTURING' ? (
-              <span className="text-orange-400">
-                Đang lấy mẫu: {calState.samples}/{calState.samplesNeeded}
+      {/* Floating Calibration Status & Instructions Card */}
+      {isCalibrating && (
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-30 pointer-events-none text-center max-w-xl w-full px-4">
+          <div className="bg-navy-950/95 border-2 border-cyan-500/60 rounded-2xl p-4 shadow-[0_0_50px_rgba(0,0,0,0.8)] backdrop-blur-md">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-bold text-cyan-300 flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping inline-block" />
+                {calState?.message || `Hãy đứng chân vào Vòng tròn ${calState?.pointIndex + 1}`}
               </span>
-            ) : (
-              <span>Khoảng cách: {Math.round(calState.distancePx)}px</span>
-            )}
+              <span className="text-xs font-mono font-bold text-amber-400">
+                {calState?.samples || 0}/{calState?.samplesNeeded || 30} ({calState?.progressPct || 0}%)
+              </span>
+            </div>
+            
+            <div className="w-full h-3 bg-navy-900 rounded-full overflow-hidden border border-cyan-500/30">
+              <div
+                className="h-full bg-gradient-to-r from-cyan-500 via-amber-400 to-green-400 transition-all duration-150 rounded-full"
+                style={{ width: `${calState?.progressPct || 0}%` }}
+              />
+            </div>
+
+            <div className="text-[11px] text-slate-400 mt-2 flex items-center justify-between">
+              <span>💡 Đứng yên ~1s để hệ thống chạy 0% ➔ 100% tự lưu</span>
+              <span>Bấm <kbd className="px-1.5 py-0.5 bg-navy-800 border border-slate-600 rounded text-slate-200 font-mono text-[10px]">Space</kbd> để chốt nhanh</span>
+            </div>
           </div>
-        </>
+        </div>
       )}
 
       {/* Review Modal Dialog on Wall screen */}

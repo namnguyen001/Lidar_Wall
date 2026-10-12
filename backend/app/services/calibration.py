@@ -28,7 +28,9 @@ class CalibrationState(BaseModel):
     handUv: list[float] | None = None
     distancePx: float = 0.0
     samples: int = 0
-    samplesNeeded: int = 40
+    samplesNeeded: int = 30
+    progressPct: int = 0
+    savedPoints: list[int] = []
     capturedMm: list[list[float]] = []
     result: CalibrationResult | None = None
     message: str = ""
@@ -40,8 +42,8 @@ class CalibrationService:
         self.state = CalibrationState()
         self.lock = asyncio.Lock()
         
-        self.auto_capture_radius_px = 200.0
-        self.stable_frames_needed = 4
+        self.auto_capture_radius_px = 350.0
+        self.stable_frames_needed = 3
         self.stable_frames_count = 0
         self.current_samples_mm: list[tuple[float, float]] = []
         self.last_seen_mm: tuple[float, float] | None = None
@@ -69,7 +71,7 @@ class CalibrationService:
         self.last_ws_time = 0.0
         await self._broadcast_state()
 
-    async def start(self, lidar_id: str, targets_uv: list[list[float]], samples_needed: int = 40):
+    async def start(self, lidar_id: str, targets_uv: list[list[float]], samples_needed: int = 30):
         async with self.lock:
             if self.state.state not in ["IDLE", "COMMITTED", "CANCELLED", "FAILED"]:
                 raise ValueError("CALIBRATION_BUSY")
@@ -84,13 +86,13 @@ class CalibrationService:
                 
             self.h0 = compute_h0(list(lidar_conf.scanArea.quadMm))
             if self.h0 is None:
-                raise ValueError("Invalid Scan Area Quad")
+                self.h0 = compute_h0([[-2000, 3000], [2000, 3000], [2000, 300], [-2000, 300]])
                 
             if not targets_uv:
                 if getattr(lidar_conf, 'coverageUv', None) and len(lidar_conf.coverageUv) == 4:
                     targets_uv = [list(pt) for pt in lidar_conf.coverageUv]
                 else:
-                    targets_uv = [[0.1, 0.1], [0.9, 0.1], [0.9, 0.9], [0.1, 0.9]]
+                    targets_uv = [[0.2, 0.25], [0.8, 0.25], [0.8, 0.75], [0.2, 0.75]]
                 
             self.state = CalibrationState(
                 state="WAIT_HAND",
@@ -100,18 +102,21 @@ class CalibrationService:
                 targetsUv=targets_uv,
                 currentTargetUv=targets_uv[0],
                 samplesNeeded=samples_needed,
+                progressPct=0,
+                savedPoints=[],
                 capturedMm=[],
-                message=f"Calibrating Point 1/{len(targets_uv)}"
+                message="ĐIỂM 1 / 4 (Góc Trên - Trái): Hãy đặt chân/dép vào Vòng tròn 1"
             )
             self.stable_frames_count = 0
             self.current_samples_mm = []
+            self.last_seen_mm = None
             
         await self.force_broadcast()
 
     async def cancel(self):
         async with self.lock:
             self.state.state = "CANCELLED"
-            self.state.message = "Cancelled"
+            self.state.message = "Đã hủy hiệu chuẩn"
         await self.force_broadcast()
         
     async def process_blobs(self, lidar_id: str, raw_blobs_mm: list[tuple[float, float]]):
@@ -126,113 +131,129 @@ class CalibrationService:
                 self.state.handUv = None
                 self.state.distancePx = 9999.0
                 if self.state.state == "CAPTURING":
-                    # Hand left during capture -> back to WAIT_HAND
                     self.state.state = "WAIT_HAND"
                     self.state.samples = 0
+                    self.state.progressPct = 0
                     self.current_samples_mm = []
                     self.stable_frames_count = 0
-                    self.state.message = "Hand lost. Please return."
+                    self.state.message = f"Chưa thấy vật cản! Hãy đưa chân vào Vòng tròn {self.state.pointIndex + 1}."
                 await self._broadcast_state()
                 return
 
-            # Find closest blob in UV
             pts_mm = np.array(raw_blobs_mm)
-            assert self.h0 is not None
-            uvs = project(pts_mm, self.h0)
             
-            target_uv = np.array(self.state.currentTargetUv)
-            diffs = uvs - target_uv
-            diffs_px = diffs * np.array([self.wall_width_px, self.wall_height_px])
-            dists = np.linalg.norm(diffs_px, axis=1)
-            
-            best_idx = int(np.argmin(dists))
-            best_dist = dists[best_idx]
-            best_uv = uvs[best_idx]
-            best_mm = pts_mm[best_idx]
+            # Duplicate prevention: if points were already captured, ensure candidate is at least 350mm away
+            valid_candidates = []
+            if len(self.state.capturedMm) > 0:
+                prev_pts = np.array(self.state.capturedMm)
+                for pt in pts_mm:
+                    dists_to_prev = np.linalg.norm(prev_pts - pt, axis=1)
+                    if np.all(dists_to_prev >= 350.0):
+                        valid_candidates.append(pt)
+                if not valid_candidates:
+                    self.state.message = f"⚠ Bạn đang ở quá gần Điểm {self.state.pointIndex}! Hãy bước chân sang Vòng tròn {self.state.pointIndex + 1}."
+                    self.state.samples = 0
+                    self.state.progressPct = 0
+                    self.current_samples_mm = []
+                    await self._broadcast_state()
+                    return
+                best_mm = valid_candidates[0]
+            else:
+                best_mm = pts_mm[0]
             
             self.last_seen_mm = (float(best_mm[0]), float(best_mm[1]))
-            self.state.handUv = best_uv.tolist()
-            self.state.distancePx = float(best_dist)
             
-            if self.state.state == "WAIT_HAND":
-                if best_dist < self.auto_capture_radius_px:
-                    self.stable_frames_count += 1
-                    if self.stable_frames_count >= self.stable_frames_needed:
-                        self.state.state = "CAPTURING"
-                        self.state.samples = 1
-                        self.current_samples_mm = [(float(best_mm[0]), float(best_mm[1]))]
-                        self.state.message = f"Hold still ({self.state.pointIndex + 1}/{self.state.pointCount})..."
-                else:
-                    self.stable_frames_count = 0
-                    self.state.message = f"Điểm {self.state.pointIndex + 1}: Cách tâm {int(best_dist)}px. Bấm [Space] hoặc chốt điểm để lấy ngay!"
-                    
-            elif self.state.state == "CAPTURING":
-                if best_dist > self.auto_capture_radius_px * 1.5:
-                    # Moved away too far
-                    self.state.state = "WAIT_HAND"
-                    self.state.samples = 0
-                    self.current_samples_mm = []
-                    self.stable_frames_count = 0
-                    self.state.message = "Moved too far. Restarting point."
-                else:
-                    self.current_samples_mm.append((best_mm[0], best_mm[1]))
-                    self.state.samples = len(self.current_samples_mm)
-                    if self.state.samples >= self.state.samplesNeeded:
-                        # Finished point
-                        self._finish_point()
+            # Project to UV if H0 is available
+            if self.h0 is not None:
+                try:
+                    uv = project(np.array([best_mm]), self.h0)[0]
+                    self.state.handUv = uv.tolist()
+                    target_uv = np.array(self.state.currentTargetUv)
+                    diff_px = (uv - target_uv) * np.array([self.wall_width_px, self.wall_height_px])
+                    self.state.distancePx = float(np.linalg.norm(diff_px))
+                except Exception:
+                    self.state.distancePx = 0.0
+            
+            # Accumulate samples
+            self.current_samples_mm.append((float(best_mm[0]), float(best_mm[1])))
+            self.state.state = "CAPTURING"
+            self.state.samples = len(self.current_samples_mm)
+            self.state.progressPct = min(100, int((self.state.samples / self.state.samplesNeeded) * 100))
+            self.state.message = f"Đang lấy mẫu Điểm {self.state.pointIndex + 1}: {self.state.progressPct}% (Giữ yên chân)..."
+            
+            if self.state.samples >= self.state.samplesNeeded:
+                self._finish_point()
                         
         await self._broadcast_state()
         
     def _finish_point(self):
-        pts = np.array(self.current_samples_mm)
-        median_mm = np.median(pts, axis=0)
-        mad = np.median(np.abs(pts - median_mm))
-        
-        if mad > 25.0:
-            self.state.state = "WAIT_HAND"
-            self.state.samples = 0
-            self.current_samples_mm = []
-            self.stable_frames_count = 0
-            self.state.message = f"Too much noise (MAD={mad:.1f}mm). Please redo."
+        if not self.current_samples_mm:
             return
             
-        self.state.capturedMm.append(median_mm.tolist())
-        self.state.pointIndex += 1
+        pts = np.array(self.current_samples_mm)
+        median_mm = np.median(pts, axis=0)
+        mad = float(np.median(np.abs(pts - median_mm)))
         
-        if self.state.pointIndex >= self.state.pointCount:
+        if mad > 60.0:
+            self.state.state = "WAIT_HAND"
+            self.state.samples = 0
+            self.state.progressPct = 0
+            self.current_samples_mm = []
+            self.state.message = f"Vật thể rung lắc (dao động {mad:.0f}mm). Hãy giữ yên chân để lấy mẫu lại."
+            return
+            
+        self.state.capturedMm.append([float(median_mm[0]), float(median_mm[1])])
+        self.state.savedPoints.append(self.state.pointIndex)
+        self.state.progressPct = 100
+        saved_num = self.state.pointIndex + 1
+        
+        if len(self.state.capturedMm) >= self.state.pointCount:
             self._compute()
         else:
-            self.state.state = "WAIT_HAND"
+            self.state.pointIndex += 1
             self.state.currentTargetUv = self.state.targetsUv[self.state.pointIndex]
             self.state.samples = 0
+            self.state.progressPct = 0
             self.current_samples_mm = []
-            self.stable_frames_count = 0
-            self.state.message = f"Calibrating Point {self.state.pointIndex + 1}/{self.state.pointCount}"
+            self.state.state = "WAIT_HAND"
+            self.state.message = f"✓ ĐÃ LƯU ĐIỂM {saved_num}! Hãy di chuyển sang Điểm {self.state.pointIndex + 1}."
 
     async def manual_capture(self):
         async with self.lock:
             if self.state.state in ["WAIT_HAND", "CAPTURING"]:
                 sample = None
-                if len(self.current_samples_mm) > 0:
+                if len(self.current_samples_mm) >= 5:
                     pts = np.array(self.current_samples_mm)
                     sample = np.median(pts, axis=0).tolist()
                 elif self.last_seen_mm is not None:
                     sample = [float(self.last_seen_mm[0]), float(self.last_seen_mm[1])]
                 
                 if sample is not None:
+                    if len(self.state.capturedMm) > 0:
+                        prev_pts = np.array(self.state.capturedMm)
+                        dists = np.linalg.norm(prev_pts - np.array(sample), axis=1)
+                        if np.any(dists < 300.0):
+                            self.state.message = f"⚠ Quá gần Điểm {self.state.pointIndex}! Hãy di chuyển sang góc tiếp theo của máy chiếu."
+                            await self.force_broadcast()
+                            return
+                    
                     self.state.capturedMm.append(sample)
-                    self.state.pointIndex += 1
-                    if self.state.pointIndex >= self.state.pointCount:
+                    self.state.savedPoints.append(self.state.pointIndex)
+                    self.state.progressPct = 100
+                    saved_num = self.state.pointIndex + 1
+                    
+                    if len(self.state.capturedMm) >= self.state.pointCount:
                         self._compute()
                     else:
-                        self.state.state = "WAIT_HAND"
+                        self.state.pointIndex += 1
                         self.state.currentTargetUv = self.state.targetsUv[self.state.pointIndex]
                         self.state.samples = 0
+                        self.state.progressPct = 0
                         self.current_samples_mm = []
-                        self.stable_frames_count = 0
-                        self.state.message = f"Đã chốt điểm {self.state.pointIndex}! Chuyển sang điểm {self.state.pointIndex + 1}/{self.state.pointCount}"
+                        self.state.state = "WAIT_HAND"
+                        self.state.message = f"✓ ĐÃ LƯU ĐIỂM {saved_num}! Hãy di chuyển sang Điểm {self.state.pointIndex + 1}."
                 else:
-                    self.state.message = "LiDAR chưa thấy vật cản! Hãy đứng chân hoặc đặt vật cao hơn 5cm vào điểm ngắm."
+                    self.state.message = "LiDAR chưa thấy vật cản! Hãy đứng chân hoặc đặt dép vào vòng tròn mục tiêu."
         await self.force_broadcast()
         
     def _compute(self):
@@ -294,9 +315,12 @@ class CalibrationService:
                                 [-margin, 1.0 + margin]
                             ], dtype=np.float32)
                             wall_quad_mm = project(corners_uv, H_inv)
-                            lidar.scanArea.quadMm = tuple((float(p[0]), float(p[1])) for p in wall_quad_mm)
-                            lidar.coverageUv = ((0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0))
-                            logger.info(f"Updated scanArea.quadMm and coverageUv for lidar {self.state.lidarId}")
+                            if np.all(np.abs(wall_quad_mm) < 15000.0):
+                                lidar.scanArea.quadMm = tuple((float(p[0]), float(p[1])) for p in wall_quad_mm)
+                                lidar.coverageUv = ((0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0))
+                                logger.info(f"Updated scanArea.quadMm and coverageUv for lidar {self.state.lidarId}")
+                            else:
+                                logger.warning(f"Derived wall quad exceeds physical room bounds: {wall_quad_mm}")
                         except Exception as quad_err:
                             logger.warning(f"Could not derive scanArea from H_inv: {quad_err}")
 
